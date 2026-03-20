@@ -1,4 +1,3 @@
-import { OciAccount } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { decrypt, encrypt } from "@/lib/crypto";
 
@@ -20,7 +19,11 @@ export interface StoredOracleAccount {
   updatedAt: string;
 }
 
-function mapDbAccount(account: OciAccount): StoredOracleAccount {
+type DbOciAccount = Awaited<ReturnType<typeof prisma.ociAccount.findFirst>> extends infer T
+  ? NonNullable<T>
+  : never;
+
+function mapDbAccount(account: DbOciAccount): StoredOracleAccount {
   return {
     id: account.id,
     userId: account.userId,
