@@ -1,4 +1,8 @@
-# OCI Panel
+# OCI Panel / 甲骨文控制面板
+
+[![Build](https://github.com/Lulu-Grant/oci-panel/actions/workflows/build.yml/badge.svg)](https://github.com/Lulu-Grant/oci-panel/actions/workflows/build.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
+[![Last Commit](https://img.shields.io/github/last-commit/Lulu-Grant/oci-panel)](https://github.com/Lulu-Grant/oci-panel/commits/main)
 
 统一的 Oracle Cloud / OCI 多账户资产控制台。
 
@@ -18,7 +22,7 @@
 - 日志 / 审计
 - 逐步扩展更多 OCI 原生能力
 
-## 当前已完成主线
+## Screenshots
 
 ### 平台基础
 - 平台注册 / 登录
@@ -27,7 +31,6 @@
 - Prisma 7 + SQLite
 - 敏感凭据服务端加密存储
 <img width="688" height="681" alt="截圖 2026-03-20 18 05 24" src="https://github.com/user-attachments/assets/e2c88d1f-609a-40b6-8a5e-e8fa36002220" />
-
 
 ### OCI 账户管理
 - 添加 OCI 账户
@@ -74,18 +77,21 @@
 <img width="788" height="780" alt="截圖 2026-03-20 18 07 50" src="https://github.com/user-attachments/assets/de4caa6c-3fd1-43af-9307-c27dfa931143" />
 <img width="782" height="686" alt="截圖 2026-03-20 18 07 44" src="https://github.com/user-attachments/assets/86d4622a-aad3-4e4f-b7ca-811adadc2c7b" />
 
-### 容量 / 资源
-- Region subscriptions
-- Availability Domains
-- Services
-- Limit values
-- Compute 重点服务展示
-- 结构化额度展示
+## 当前已完成主线
 
-### 日志
-- 当前用户操作日志
-- 日志数据库存储（`OperationLog`）
-- 账户测试 / 实例动作 / 创建实例日志记录
+### 已完成平台化阶段
+- Phase 1：平台认证基础壳
+- Phase 2：OCI 账户 user-scoped 化
+- Phase 3：日志 user-scoped 化
+- Phase 4：主 API user-scoped 化
+- Phase 4.5：legacy JSON 双轨清理
+
+### 已完成 P2 主线
+- P2A：创建实例增强
+- P2B：实例详情资产化
+- P2C：实例列表资产化
+- P2D：Capacity 产品化
+- P2E：Dashboard 产品化第一版
 
 ## 手动刷新控制台策略
 
@@ -132,9 +138,7 @@
 - next-auth
 - oci-sdk
 
-## 运行方式
-
-### 开发模式
+## 快速开始
 
 ```bash
 npm install
@@ -144,6 +148,32 @@ npm run dev -- --hostname 0.0.0.0
 
 默认地址：
 - `http://localhost:3000`
+
+## 环境变量
+
+见 `.env.example`。
+
+本地基础示例：
+
+```env
+DATABASE_URL="file:./dev.db"
+AUTH_SECRET="change-me-to-a-random-secret"
+NEXTAUTH_URL="http://localhost:3000"
+NEXT_PUBLIC_AUTH_GOOGLE_ENABLED="false"
+```
+
+说明：
+- 本地默认仅启用邮箱密码登录
+- Google 登录只有在后端与前端环境变量都配置完整时才应启用
+- 未启用 Google 时，前端不应显示真实 Google 登录按钮
+
+## 运行方式
+
+### 开发模式
+
+```bash
+npm run dev -- --hostname 0.0.0.0
+```
 
 ### 常驻模式（macOS launchd）
 
@@ -165,23 +195,16 @@ launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/org.openclaw.oci-panel.p
 - `.runtime/oci-panel.out.log`
 - `.runtime/oci-panel.err.log`
 
-## 环境变量
+## Roadmap
 
-见 `.env.example`。
+近期最值得继续的方向：
 
-本地基础示例：
-
-```env
-DATABASE_URL="file:./dev.db"
-AUTH_SECRET="change-me-to-a-random-secret"
-NEXTAUTH_URL="http://localhost:3000"
-NEXT_PUBLIC_AUTH_GOOGLE_ENABLED="false"
-```
-
-说明：
-- 本地默认仅启用邮箱密码登录
-- Google 登录只有在后端与前端环境变量都配置完整时才应启用
-- 未启用 Google 时，前端不应显示真实 Google 登录按钮
+- [ ] 推进 Instances 页面 DD 的 OCI 原生能力版，从能力检测走向真实任务提交
+- [ ] 深挖 `osmanagementhub` 的 job / work request / managed instance 能力
+- [ ] 继续强化 Dashboard 首页作为多账户 OCI 控制台入口
+- [ ] 打磨 Create / Capacity / Instances 的统一体验
+- [ ] 增强日志 / 审计 / 错误态 / 空态体验
+- [ ] 逐步补齐 GitHub Actions / CI / 文档体系
 
 ## Legacy 迁移
 
@@ -212,7 +235,7 @@ npm run migrate:legacy-json -- --email you@example.com --archive
 - `src/app/instances/page.tsx`
 - `src/app/capacity/page.tsx`
 
-## 当前开发原则
+## 开发原则
 
 - 不要回退到 JSON 运行时存储
 - 不要把项目做回“实例开关机小工具”
@@ -220,3 +243,9 @@ npm run migrate:legacy-json -- --email you@example.com --archive
 - 不要继续把 DD 做成 SSH 凭据输入式方案
 - 新一轮开发前建议先读 `PROJECT_INDEX.md`
 - 做完大改后记得同步更新索引文件
+
+## 开源协作
+
+- 贡献指南：`CONTRIBUTING.md`
+- 安全说明：`SECURITY.md`
+- License：`MIT`
