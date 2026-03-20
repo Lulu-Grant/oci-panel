@@ -26,7 +26,8 @@
 - middleware 保护
 - Prisma 7 + SQLite
 - 敏感凭据服务端加密存储
-<img width="1682" height="850" alt="截圖 2026-03-20 17 58 00" src="https://github.com/user-attachments/assets/fdaf0015-6156-4f10-a44f-c5c2753e4bc9" />
+<img width="688" height="681" alt="截圖 2026-03-20 18 05 24" src="https://github.com/user-attachments/assets/e2c88d1f-609a-40b6-8a5e-e8fa36002220" />
+
 
 ### OCI 账户管理
 - 添加 OCI 账户
@@ -35,8 +36,7 @@
 - 编辑 / 删除 / 启用 / 停用账户
 - 当前用户范围内的账户隔离（user-scoped）
 - 账户存储已切到 Prisma `OciAccount`
-<img width="650" height="846" alt="截圖 2026-03-20 18 00 44" src="https://github.com/user-attachments/assets/32d78e7c-343d-465d-9a80-fd66b5b93979" />
-<img width="1448" height="399" alt="截圖 2026-03-20 18 00 35" src="https://github.com/user-attachments/assets/a40eb31b-4222-4346-a9d2-e88bdaad1a83" />
+<img width="1359" height="947" alt="截圖 2026-03-20 18 06 15" src="https://github.com/user-attachments/assets/f8a6be82-a7d6-49b9-af4a-d9c8e5604b82" />
 
 ### 实例管理
 - 实例列表读取
@@ -46,7 +46,7 @@
 - 详情弹窗
 - 创建后状态跟踪
 - 高级 DD 功能已转向 OCI 原生能力版探索（不再继续强化 SSH 凭据输入方案）
-<img width="1426" height="743" alt="截圖 2026-03-20 18 01 42" src="https://github.com/user-attachments/assets/722baebd-af99-49f4-9cb4-61c8501e023f" />
+<img width="1442" height="400" alt="截圖 2026-03-20 18 06 38" src="https://github.com/user-attachments/assets/a9de6b6b-60e2-404a-96fd-c52cdba850b5" />
 
 ### 实例资产详情
 - 实例基础信息
@@ -56,7 +56,7 @@
 - Boot Volume 明细
 - 风险提示
 - 资产关系区
-<img width="1428" height="865" alt="截圖 2026-03-20 17 58 51" src="https://github.com/user-attachments/assets/196343c9-b05c-4dc6-b45a-81f13b907987" />
+<img width="1429" height="726" alt="截圖 2026-03-20 18 07 09" src="https://github.com/user-attachments/assets/f3b101c0-9b90-4350-91ce-63a2ad099cf5" />
 
 ### 创建实例
 - 账户切换联动
@@ -69,6 +69,10 @@
 - 调用真实 OCI `launchInstance`
 - 与 capacity 联动的创建可行性提示
 - 支持 `generated-ssh` / `manual-ssh` / `password` 三种登录初始化模式
+<img width="786" height="379" alt="截圖 2026-03-20 18 07 58" src="https://github.com/user-attachments/assets/0b57d97f-7175-4c28-9a9b-67ebec317e65" />
+<img width="641" height="526" alt="截圖 2026-03-20 18 07 54" src="https://github.com/user-attachments/assets/2cd2f26f-1625-407d-898c-14cd2007ce9b" />
+<img width="788" height="780" alt="截圖 2026-03-20 18 07 50" src="https://github.com/user-attachments/assets/de4caa6c-3fd1-43af-9307-c27dfa931143" />
+<img width="782" height="686" alt="截圖 2026-03-20 18 07 44" src="https://github.com/user-attachments/assets/86d4622a-aad3-4e4f-b7ca-811adadc2c7b" />
 
 ### 容量 / 资源
 - Region subscriptions
