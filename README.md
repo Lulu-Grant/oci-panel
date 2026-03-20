@@ -26,6 +26,7 @@
 - middleware 保护
 - Prisma 7 + SQLite
 - 敏感凭据服务端加密存储
+<img width="1682" height="850" alt="截圖 2026-03-20 17 58 00" src="https://github.com/user-attachments/assets/fdaf0015-6156-4f10-a44f-c5c2753e4bc9" />
 
 ### OCI 账户管理
 - 添加 OCI 账户
@@ -34,6 +35,8 @@
 - 编辑 / 删除 / 启用 / 停用账户
 - 当前用户范围内的账户隔离（user-scoped）
 - 账户存储已切到 Prisma `OciAccount`
+<img width="650" height="846" alt="截圖 2026-03-20 18 00 44" src="https://github.com/user-attachments/assets/32d78e7c-343d-465d-9a80-fd66b5b93979" />
+<img width="1448" height="399" alt="截圖 2026-03-20 18 00 35" src="https://github.com/user-attachments/assets/a40eb31b-4222-4346-a9d2-e88bdaad1a83" />
 
 ### 实例管理
 - 实例列表读取
@@ -43,6 +46,7 @@
 - 详情弹窗
 - 创建后状态跟踪
 - 高级 DD 功能已转向 OCI 原生能力版探索（不再继续强化 SSH 凭据输入方案）
+<img width="1426" height="743" alt="截圖 2026-03-20 18 01 42" src="https://github.com/user-attachments/assets/722baebd-af99-49f4-9cb4-61c8501e023f" />
 
 ### 实例资产详情
 - 实例基础信息
@@ -52,6 +56,7 @@
 - Boot Volume 明细
 - 风险提示
 - 资产关系区
+<img width="1428" height="865" alt="截圖 2026-03-20 17 58 51" src="https://github.com/user-attachments/assets/196343c9-b05c-4dc6-b45a-81f13b907987" />
 
 ### 创建实例
 - 账户切换联动
