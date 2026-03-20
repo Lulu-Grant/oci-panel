@@ -1,0 +1,213 @@
+# OCI Panel
+
+统一的 Oracle Cloud / OCI 多账户资产控制台。
+
+## 项目定位
+
+这不是简单的实例开关机工具，而是一个逐步平台化的 OCI 资产控制台，采用两层结构：
+
+- 平台用户账户
+- 用户绑定的多个 OCI 账户
+- OCI 账户下的资产、日志、容量与创建能力
+
+当前方向重点：
+- 多账户 OCI 资产管理
+- 实例资产查看与控制
+- 创建实例与创建前可行性提示
+- 容量 / 资源查询
+- 日志 / 审计
+- 逐步扩展更多 OCI 原生能力
+
+## 当前已完成主线
+
+### 平台基础
+- 平台注册 / 登录
+- next-auth 认证基础壳
+- middleware 保护
+- Prisma 7 + SQLite
+- 敏感凭据服务端加密存储
+
+### OCI 账户管理
+- 添加 OCI 账户
+- 测试连接
+- 默认账户
+- 编辑 / 删除 / 启用 / 停用账户
+- 当前用户范围内的账户隔离（user-scoped）
+- 账户存储已切到 Prisma `OciAccount`
+
+### 实例管理
+- 实例列表读取
+- 开机 / 关机 / 重启
+- 搜索与状态筛选
+- 资产标记（公网 / 双栈 / Flex / 风险）
+- 详情弹窗
+- 创建后状态跟踪
+- 高级 DD 功能已转向 OCI 原生能力版探索（不再继续强化 SSH 凭据输入方案）
+
+### 实例资产详情
+- 实例基础信息
+- 镜像 / 系统信息
+- Shape 深信息
+- VCN / Subnet / VNIC / NSG 明细
+- Boot Volume 明细
+- 风险提示
+- 资产关系区
+
+### 创建实例
+- 账户切换联动
+- AD / Shape / Image / VCN / Subnet 加载
+- Shape / 镜像搜索与快捷筛选
+- 网络约束校验
+- Flex OCPU / 内存输入
+- 模板预设
+- 默认配置记忆
+- 调用真实 OCI `launchInstance`
+- 与 capacity 联动的创建可行性提示
+- 支持 `generated-ssh` / `manual-ssh` / `password` 三种登录初始化模式
+
+### 容量 / 资源
+- Region subscriptions
+- Availability Domains
+- Services
+- Limit values
+- Compute 重点服务展示
+- 结构化额度展示
+
+### 日志
+- 当前用户操作日志
+- 日志数据库存储（`OperationLog`）
+- 账户测试 / 实例动作 / 创建实例日志记录
+
+## 手动刷新控制台策略
+
+项目当前采用“手动刷新型控制台”策略：
+
+- 页面优先显示上次成功加载的数据
+- 不主动每次进页就重新请求
+- 只有点击刷新按钮才拉最新
+- 显示“上次刷新时间”
+- 新增 / 编辑 / 删除等操作后优先局部更新或标记过期
+- 不自动整页重查
+
+当前已接入页面：
+- `/accounts`
+- `/`
+- `/instances`
+- `/capacity`
+- `/logs`
+- `/create`
+
+## 数据存储现状
+
+当前主数据源：
+
+- OCI 账户：Prisma `OciAccount`
+- 日志：Prisma `OperationLog`
+
+已不再作为运行时主数据源：
+
+- `data/oracle-accounts.json`
+- `data/operation-logs.json`
+
+旧 JSON 仅用于显式迁移。
+
+## 技术栈
+
+- Next.js 16
+- React 19
+- TypeScript
+- Tailwind CSS
+- Prisma 7
+- SQLite
+- `@prisma/adapter-better-sqlite3`
+- next-auth
+- oci-sdk
+
+## 运行方式
+
+### 开发模式
+
+```bash
+npm install
+cp .env.example .env
+npm run dev -- --hostname 0.0.0.0
+```
+
+默认地址：
+- `http://localhost:3000`
+
+### 常驻模式（macOS launchd）
+
+服务名：
+- `org.openclaw.oci-panel`
+
+常用命令：
+
+```bash
+launchctl print gui/$(id -u)/org.openclaw.oci-panel
+launchctl kickstart -k gui/$(id -u)/org.openclaw.oci-panel
+launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/org.openclaw.oci-panel.plist
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/org.openclaw.oci-panel.plist
+```
+
+日志位置：
+- `.runtime/launchd.out.log`
+- `.runtime/launchd.err.log`
+- `.runtime/oci-panel.out.log`
+- `.runtime/oci-panel.err.log`
+
+## 环境变量
+
+见 `.env.example`。
+
+本地基础示例：
+
+```env
+DATABASE_URL="file:./dev.db"
+AUTH_SECRET="change-me-to-a-random-secret"
+NEXTAUTH_URL="http://localhost:3000"
+NEXT_PUBLIC_AUTH_GOOGLE_ENABLED="false"
+```
+
+说明：
+- 本地默认仅启用邮箱密码登录
+- Google 登录只有在后端与前端环境变量都配置完整时才应启用
+- 未启用 Google 时，前端不应显示真实 Google 登录按钮
+
+## Legacy 迁移
+
+如果旧 JSON 还需要迁移到数据库：
+
+```bash
+npm run migrate:legacy-json -- --email you@example.com
+npm run migrate:legacy-json -- --user-id <platform-user-id>
+npm run migrate:legacy-json -- --email you@example.com --archive
+```
+
+参考文件：
+- `LEGACY_CLEANUP.md`
+- `scripts/migrate-legacy-json-to-prisma.mjs`
+
+## 重要项目文件
+
+如果要快速理解项目，优先阅读：
+
+- `PROJECT_INDEX.md`
+- `prisma/schema.prisma`
+- `src/lib/auth.ts`
+- `src/lib/accounts-store.ts`
+- `src/lib/logs-store.ts`
+- `src/lib/oci.ts`
+- `src/lib/manual-cache.ts`
+- `src/app/create/page.tsx`
+- `src/app/instances/page.tsx`
+- `src/app/capacity/page.tsx`
+
+## 当前开发原则
+
+- 不要回退到 JSON 运行时存储
+- 不要把项目做回“实例开关机小工具”
+- 不要回退手动刷新控制台策略
+- 不要继续把 DD 做成 SSH 凭据输入式方案
+- 新一轮开发前建议先读 `PROJECT_INDEX.md`
+- 做完大改后记得同步更新索引文件
