@@ -23,6 +23,8 @@ type DbOciAccount = Awaited<ReturnType<typeof prisma.ociAccount.findFirst>> exte
   ? NonNullable<T>
   : never;
 
+type TransactionClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+
 function mapDbAccount(account: DbOciAccount): StoredOracleAccount {
   return {
     id: account.id,
@@ -67,7 +69,7 @@ export async function createAccount(
 
   const shouldBeDefault = input.isDefault || existing.length === 0;
 
-  const created = await prisma.$transaction(async (tx) => {
+  const created = await prisma.$transaction(async (tx: TransactionClient) => {
     if (shouldBeDefault) {
       await tx.ociAccount.updateMany({
         where: { userId, isDefault: true },
@@ -113,7 +115,7 @@ export async function updateAccount(
 
   const shouldBeDefault = Boolean(input.isDefault);
 
-  await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx: TransactionClient) => {
     if (shouldBeDefault) {
       await tx.ociAccount.updateMany({
         where: { userId, isDefault: true, NOT: { id: accountId } },
@@ -162,7 +164,7 @@ export async function setAccountActiveState(userId: string, accountId: string, i
       throw new Error("默认账户不能直接停用，请先新增或切换到其他账户");
     }
 
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: TransactionClient) => {
       await tx.ociAccount.update({ where: { id: accountId }, data: { isActive: false, isDefault: false } });
       await tx.ociAccount.update({ where: { id: fallback.id }, data: { isDefault: true } });
     });
@@ -186,7 +188,7 @@ export async function setDefaultAccount(userId: string, accountId: string): Prom
     throw new Error("账户不存在");
   }
 
-  await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx: TransactionClient) => {
     await tx.ociAccount.updateMany({
       where: { userId, isDefault: true },
       data: { isDefault: false },
@@ -220,7 +222,7 @@ export async function deleteAccount(userId: string, accountId: string): Promise<
     throw new Error("账户不存在");
   }
 
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx: TransactionClient) => {
     await tx.ociAccount.delete({
       where: { id: accountId },
     });
