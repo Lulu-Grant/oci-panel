@@ -6,6 +6,8 @@
 
 统一的 Oracle Cloud / OCI 多账户资产控制台。
 
+OCI Panel is a multi-account Oracle Cloud infrastructure console focused on account binding, instance lifecycle operations, asset visibility, capacity insights, creation workflows, and auditability — not just a lightweight power-toggle tool.
+
 ## 首页展示图 / 架构图
 
 项目架构说明已整理到：
