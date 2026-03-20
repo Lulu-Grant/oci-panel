@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "postinstall": "prisma generate",
+    "prisma:generate": "prisma generate",
     "migrate:legacy-json": "node ./scripts/migrate-legacy-json-to-prisma.mjs"
   },
   "dependencies": {
