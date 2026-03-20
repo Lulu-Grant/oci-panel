@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Project README
+    url: https://github.com/Lulu-Grant/oci-panel#readme
+    about: Read project overview, setup, and development notes first.
