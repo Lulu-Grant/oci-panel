@@ -248,17 +248,8 @@ npm run migrate:legacy-json -- --email you@example.com --archive
 - `src/app/instances/page.tsx`
 - `src/app/capacity/page.tsx`
 
-## 开发原则
-
-- 不要回退到 JSON 运行时存储
-- 不要把项目做回“实例开关机小工具”
-- 不要回退手动刷新控制台策略
-- 不要继续把 DD 做成 SSH 凭据输入式方案
-- 新一轮开发前建议先读 `PROJECT_INDEX.md`
-- 做完大改后记得同步更新索引文件
-
 ## 开源协作
-
+- 同步更新索引文件：`PROJECT_INDEX.md`
 - 贡献指南：`CONTRIBUTING.md`
 - 安全说明：`SECURITY.md`
 - License：`MIT`
