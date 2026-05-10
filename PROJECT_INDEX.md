@@ -182,10 +182,12 @@ launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/org.openclaw.oci-panel.p
 - `DATABASE_URL`
 - `AUTH_SECRET`
 - `NEXTAUTH_URL`
+- `AUTH_REGISTRATION_ENABLED`
 - `NEXT_PUBLIC_AUTH_GOOGLE_ENABLED`
 
 说明：
 - 本地当前默认只启用邮箱密码登录
+- 公开注册在生产环境默认关闭，只有 `AUTH_REGISTRATION_ENABLED=true` 时启用
 - Google 登录只有在环境变量存在时才应该启用
 
 ---
@@ -560,6 +562,9 @@ API 响应 envelope helper，统一输出 `{ success, data, message }`。
 ### `src/lib/api-client.ts`
 前端 fetch 读取 helper，统一处理 API envelope 与错误消息。
 
+### `src/lib/registration.ts`
+公开注册策略 helper。开发 / 测试默认允许注册，生产环境默认关闭。
+
 ### `src/lib/oci.ts`
 OCI SDK 客户端构造与相关逻辑。
 
@@ -604,6 +609,7 @@ launchd 配置模板。
 ## 认证
 - 本地邮箱密码登录保留
 - 当前使用 `jwt` session strategy
+- 生产环境公开注册默认关闭
 - 未配置 Google 时不要强挂 Google provider
 - 未启用 Google 时前端不要误显示 Google 登录按钮
 
@@ -622,6 +628,7 @@ launchd 配置模板。
 - next-auth
 - 敏感字段服务端加密
 - API 响应统一使用 `{ success, data, message }`
+- Vitest 覆盖账户凭据/账户接口安全边界/停用状态/API envelope/注册策略等基线逻辑
 - 以后如有需要再切 PostgreSQL
 
 ---
@@ -652,7 +659,7 @@ SSH/DD 运行时已经移除。OS Management Hub 只保留能力检测与研究�
 ## 当前建议顺序
 
 1. OS Management Hub managed instance 匹配实测
-2. 账户凭据保留、停用账户过滤等核心路径补测试
+2. 继续补齐关键 API route 级测试
 3. 之后再考虑：
    - 更深的 OCI 资产扩展
    - 模板持久化

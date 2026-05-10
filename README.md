@@ -116,6 +116,7 @@ OCI Panel is a multi-account Oracle Cloud infrastructure console focused on acco
 - P0：凭据边界、SSH/DD 删除、CI lint/audit gate 已完成
 - P1：React hook、账户状态、日志、API envelope 收敛已完成
 - P2：Dashboard / Create / Capacity / OCI 原生操作研究已完成第一轮收口
+- 测试：Vitest 已覆盖账户凭据保留、账户接口安全边界、停用账户、API envelope 与注册策略
 
 ## 手动刷新控制台策略
 
@@ -184,10 +185,12 @@ DATABASE_URL="file:./dev.db"
 AUTH_SECRET="change-me-to-a-random-secret"
 NEXTAUTH_URL="http://localhost:3000"
 NEXT_PUBLIC_AUTH_GOOGLE_ENABLED="false"
+AUTH_REGISTRATION_ENABLED="true"
 ```
 
 说明：
 - 本地默认仅启用邮箱密码登录
+- 公开注册在生产环境默认关闭，只有 `AUTH_REGISTRATION_ENABLED=true` 时启用
 - Google 登录只有在后端与前端环境变量都配置完整时才应启用
 - 未启用 Google 时，前端不应显示真实 Google 登录按钮
 
@@ -197,6 +200,12 @@ NEXT_PUBLIC_AUTH_GOOGLE_ENABLED="false"
 
 ```bash
 npm run dev -- --hostname 0.0.0.0
+```
+
+### 测试
+
+```bash
+npm test
 ```
 
 ### 常驻模式（macOS launchd）
@@ -225,7 +234,7 @@ launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/org.openclaw.oci-panel.p
 
 - [ ] 使用真实 OCI 账户验证 OS Management Hub managed instance 匹配关系
 - [ ] 在验证后再设计 one-time scheduled job 提交，不回退到 SSH 凭据式 DD
-- [ ] 为账户凭据保留、停用账户过滤、API envelope 增加测试
+- [x] 为账户凭据保留、停用账户过滤、API envelope 增加测试
 - [ ] 继续增强日志 / 审计 / 错误态 / 空态体验
 - [ ] 评估剩余低/中危依赖 advisories 的升级路线
 

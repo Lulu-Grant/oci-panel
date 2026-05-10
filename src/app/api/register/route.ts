@@ -1,8 +1,13 @@
 import bcrypt from "bcryptjs";
 import { apiFail, apiOk } from "@/lib/api-response";
 import { prisma } from "@/lib/prisma";
+import { isPublicRegistrationEnabled } from "@/lib/registration";
 
 export async function POST(request: Request) {
+  if (!isPublicRegistrationEnabled()) {
+    return apiFail("公开注册已关闭，请联系管理员创建账户", 403);
+  }
+
   const body = await request.json();
   const name = String(body?.name || "").trim();
   const email = String(body?.email || "").trim().toLowerCase();

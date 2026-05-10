@@ -96,13 +96,28 @@ This plan resets the project around the audited baseline. Work should be done in
   - Capacity page highlights A1/Flex/OCPU/Memory-relevant limits.
   - OCI-native advanced operations research is captured in `docs/OCI_NATIVE_OPERATIONS_RESEARCH_2026-05-10.md`.
 - `npm run lint` passes with zero warnings.
+- `npm test` passes and is wired into CI.
 - `npm run build` passes.
 - `npm audit --audit-level=high` passes; low/moderate advisories remain in Prisma/next-auth/Next transitive dependencies and require separate breaking-change evaluation.
 - Browser smoke on `http://127.0.0.1:3000` passed for app render, primary navigation, hidden settings navigation, and removed DD wording.
 
 ## Next Baseline Backlog
 
-- Validate OS Management Hub managed instance matching against a real OCI account before adding any job submission endpoint.
-- Add tests around account credential preservation and disabled-account filtering.
-- Add a small internal fetch wrapper convention for future pages so new endpoints stay on the shared envelope.
-- Decide public registration policy before any internet-facing deployment.
+- [blocked-external] Validate OS Management Hub managed instance matching against a real OCI account before adding any job submission endpoint.
+- [x] Add tests around account credential preservation and disabled-account filtering.
+- [x] Add a small internal fetch wrapper convention for future pages so new endpoints stay on the shared envelope.
+- [x] Decide public registration policy before any internet-facing deployment.
+
+## Checkpoint 2 - 2026-05-10
+
+- Added `npm test` with Vitest.
+- Added focused tests for:
+  - preserving encrypted OCI credentials during metadata-only account updates
+  - explicit credential replacement
+  - disabled default-account fallback behavior
+  - rejecting disabled accounts as default
+  - API envelope helper success/failure reads
+  - account route safe-detail and metadata-only update boundaries
+  - production-default public registration policy
+- CI now runs lint, test, high-severity audit, and build.
+- Public registration now defaults to disabled in production unless `AUTH_REGISTRATION_ENABLED=true` is set.

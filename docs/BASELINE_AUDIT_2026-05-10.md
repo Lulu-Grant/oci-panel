@@ -26,6 +26,7 @@
 - Touched API routes now use a shared `{ success, data, message }` response envelope.
 - Dashboard/Create/Capacity have been refocused around the audited product baseline.
 - OCI-native advanced operations research is documented in `docs/OCI_NATIVE_OPERATIONS_RESEARCH_2026-05-10.md`.
+- `npm test` is available and covers account credential preservation, disabled-account default behavior, account route safe-detail boundaries, API envelope helpers, and registration policy.
 
 ## Product Baseline
 
@@ -52,9 +53,10 @@ The project has already moved beyond a simple instance power-control tool. The c
    - Evidence: `src/lib/crypto.ts` falls back to `dev-only-openclaw-oci-panel-key-32b`.
    - Impact: production data may be encrypted with a known secret if `APP_ENCRYPTION_KEY` is missing.
 
-3. Public registration is open by default.
+3. Public registration is open by default. **Fixed for production in current checkpoint.**
    - Evidence: `middleware.ts` explicitly allows `/api/register` and `/register`.
    - Impact: if deployed openly, anyone can create a platform user unless external access is restricted.
+   - Current policy: development/test defaults enabled; production defaults disabled unless `AUTH_REGISTRATION_ENABLED=true`.
 
 4. Dependency audit is not clean. **High severity baseline fixed; low/moderate advisories remain for separate evaluation.**
    - Evidence: `npm audit` reports 19 vulnerabilities, including high severity advisories in Next.js, Prisma toolchain dependencies, Hono, lodash, cookie, and related transitive packages.
