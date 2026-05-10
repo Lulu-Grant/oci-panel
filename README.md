@@ -8,7 +8,20 @@
 
 OCI Panel is a multi-account Oracle Cloud infrastructure console focused on account binding, instance lifecycle operations, asset visibility, capacity insights, creation workflows, and auditability — not just a lightweight power-toggle tool.
 
-## 首页展示图 / 架构图
+## 当前状态
+
+当前主线已经完成一次基线重置：
+
+- 安全边界：OCI 私钥 / passphrase 提交后只留在服务端，账户详情接口只返回安全元数据。
+- 功能取舍：SSH/DD 重装运行时已删除，实例页只保留 OCI / OS Management Hub 托管能力检测。
+- 产品重点：保留并优先推进账户、实例、资产详情、创建、容量、日志和 Dashboard。
+- API 契约：新近改动接口统一使用 `{ success, data, message }` 响应 envelope。
+- 注册策略：生产环境默认关闭公开注册，只有 `AUTH_REGISTRATION_ENABLED=true` 时开启。
+- 质量门禁：CI 运行 lint、test、高危 audit 和 build。
+
+当前不能在本地伪造完成的事项只有一个：真实 OCI 账户下的 OS Management Hub managed instance 匹配验证。验证完成前不会接入真实任务提交。
+
+## 项目文档
 
 项目架构说明已整理到：
 
@@ -17,10 +30,11 @@ OCI Panel is a multi-account Oracle Cloud infrastructure console focused on acco
 - [`docs/DEVELOPMENT_PLAN_2026-05-10.md`](./docs/DEVELOPMENT_PLAN_2026-05-10.md)
 - [`docs/OCI_NATIVE_OPERATIONS_RESEARCH_2026-05-10.md`](./docs/OCI_NATIVE_OPERATIONS_RESEARCH_2026-05-10.md)
 
-其中包含：
+这些文档包含：
 - 高层架构图
 - 产品结构图
 - 手动刷新控制台的数据流图
+- 2026-05-10 基线审计、开发计划与 OCI 原生操作研究
 
 ## 项目定位
 
@@ -36,7 +50,7 @@ OCI Panel is a multi-account Oracle Cloud infrastructure console focused on acco
 - 创建实例与创建前可行性提示
 - 容量 / 资源查询
 - 日志 / 审计
-- 逐步扩展更多 OCI 原生能力
+- 在真实托管实例验证后逐步扩展 OCI 原生能力
 
 ## Screenshots
 
@@ -116,7 +130,7 @@ OCI Panel is a multi-account Oracle Cloud infrastructure console focused on acco
 - P0：凭据边界、SSH/DD 删除、CI lint/audit gate 已完成
 - P1：React hook、账户状态、日志、API envelope 收敛已完成
 - P2：Dashboard / Create / Capacity / OCI 原生操作研究已完成第一轮收口
-- 测试：Vitest 已覆盖账户凭据保留、账户接口安全边界、停用账户、API envelope 与注册策略
+- 测试：Vitest 已覆盖账户凭据保留、账户接口安全边界、停用账户、API envelope、注册策略与注册接口
 
 ## 手动刷新控制台策略
 
@@ -208,6 +222,15 @@ npm run dev -- --hostname 0.0.0.0
 npm test
 ```
 
+### 完整本地验证
+
+```bash
+npm run lint
+npm test
+npm audit --audit-level=high
+npm run build
+```
+
 ### 常驻模式（macOS launchd）
 
 服务名：
@@ -234,7 +257,7 @@ launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/org.openclaw.oci-panel.p
 
 - [ ] 使用真实 OCI 账户验证 OS Management Hub managed instance 匹配关系
 - [ ] 在验证后再设计 one-time scheduled job 提交，不回退到 SSH 凭据式 DD
-- [x] 为账户凭据保留、停用账户过滤、API envelope 增加测试
+- [x] 为账户凭据保留、停用账户过滤、API envelope、注册策略和关键 route 增加测试
 - [ ] 继续增强日志 / 审计 / 错误态 / 空态体验
 - [ ] 评估剩余低/中危依赖 advisories 的升级路线
 

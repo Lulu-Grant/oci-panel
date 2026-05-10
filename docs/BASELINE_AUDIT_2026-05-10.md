@@ -26,7 +26,7 @@
 - Touched API routes now use a shared `{ success, data, message }` response envelope.
 - Dashboard/Create/Capacity have been refocused around the audited product baseline.
 - OCI-native advanced operations research is documented in `docs/OCI_NATIVE_OPERATIONS_RESEARCH_2026-05-10.md`.
-- `npm test` is available and covers account credential preservation, disabled-account default behavior, account route safe-detail boundaries, API envelope helpers, and registration policy.
+- `npm test` is available and covers account credential preservation, disabled-account default behavior, account route safe-detail boundaries, API envelope helpers, registration policy, and registration route behavior.
 
 ## Product Baseline
 

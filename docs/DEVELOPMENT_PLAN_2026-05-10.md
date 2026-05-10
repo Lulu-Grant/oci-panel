@@ -119,5 +119,6 @@ This plan resets the project around the audited baseline. Work should be done in
   - API envelope helper success/failure reads
   - account route safe-detail and metadata-only update boundaries
   - production-default public registration policy
+  - registration route disabled/enabled/duplicate-email behavior
 - CI now runs lint, test, high-severity audit, and build.
 - Public registration now defaults to disabled in production unless `AUTH_REGISTRATION_ENABLED=true` is set.
