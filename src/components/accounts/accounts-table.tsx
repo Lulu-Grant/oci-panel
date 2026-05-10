@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { EditAccountForm } from "@/components/accounts/edit-account-form";
+import { readApiData } from "@/lib/api-client";
 import { formatDateTimeWithRelative } from "@/lib/format";
 import { useToast } from "@/components/ui/toast";
 import { AccountItem } from "@/types/dashboard";
@@ -50,15 +51,15 @@ export function AccountsTable({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ accountId }),
       });
-      const data = await res.json();
-      pushToast({ tone: data.success ? "success" : "error", message: data.success ? `测试成功：${data.tenancyName || data.message}` : `测试失败：${data.message}` });
-      if (data.success) {
-        onAccountsChange?.((current) => current.map((account) => account.id === accountId ? {
-          ...account,
-          status: "healthy",
-          lastSync: new Date().toISOString(),
-        } : account));
-      }
+      const data = await readApiData<{ tenancyName?: string; message?: string }>(res);
+      pushToast({ tone: "success", message: `测试成功：${data.tenancyName || data.message || "OK"}` });
+      onAccountsChange?.((current) => current.map((account) => account.id === accountId ? {
+        ...account,
+        status: "healthy",
+        lastSync: new Date().toISOString(),
+      } : account));
+    } catch (error) {
+      pushToast({ tone: "error", message: error instanceof Error ? `测试失败：${error.message}` : "测试失败" });
     } finally {
       setTestingId(null);
     }
@@ -72,8 +73,7 @@ export function AccountsTable({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ accountId, action: "setDefault" }),
       });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.message || "设置默认账户失败");
+      await readApiData<{ accountId: string; isDefault: boolean }>(res);
       pushToast({ tone: "success", message: "默认账户已更新" });
       onAccountsChange?.((current) => current.map((account) => ({ ...account, isDefault: account.id === accountId })));
     } catch (error) {
@@ -87,8 +87,7 @@ export function AccountsTable({
     try {
       setDeletingId(accountId);
       const res = await fetch(`/api/accounts?accountId=${encodeURIComponent(accountId)}`, { method: "DELETE" });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.message || "删除账户失败");
+      const data = await readApiData<{ deletedId: string; nextDefaultAccountId?: string }>(res);
       pushToast({ tone: "success", message: "账户已删除" });
       onAccountsChange?.((current) => current.filter((account) => account.id !== accountId).map((account) => ({ ...account, isDefault: data.nextDefaultAccountId ? account.id === data.nextDefaultAccountId : account.isDefault })));
     } catch (error) {
@@ -107,8 +106,7 @@ export function AccountsTable({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ accountId, action: "setActive", isActive: nextActive }),
       });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.message || "更新账户状态失败");
+      const data = await readApiData<{ accountId: string; isActive: boolean; isDefault: boolean }>(res);
       pushToast({ tone: "success", message: nextActive ? "账户已启用" : "账户已停用" });
       onAccountsChange?.((current) => current.map((account) => account.id === accountId ? {
         ...account,

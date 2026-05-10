@@ -1,4 +1,5 @@
 import { getAccountById } from "@/lib/accounts-store";
+import { apiFail, apiOk } from "@/lib/api-response";
 import { requireAuthUser } from "@/lib/auth";
 import { appendLog } from "@/lib/logs-store";
 import { createComputeClient, createIdentityClient } from "@/lib/oci";
@@ -72,53 +73,56 @@ function buildCloudInit(params: { username: string; password: string; allowRootL
 export async function POST(request: Request) {
   const auth = await requireAuthUser();
   if (!auth) {
-    return Response.json({ success: false, message: "未登录" }, { status: 401 });
+    return apiFail("未登录", 401);
   }
 
   const body = (await request.json()) as LaunchInstancePayload;
 
   if (!body.accountId || !body.availabilityDomain || !body.subnetId || !body.imageId || !body.shape || !body.displayName) {
-    return Response.json({ success: false, message: "缺少必填字段：accountId / availabilityDomain / subnetId / imageId / shape / displayName" }, { status: 400 });
+    return apiFail("缺少必填字段：accountId / availabilityDomain / subnetId / imageId / shape / displayName", 400);
   }
 
   const displayName = body.displayName.trim();
   if (!displayName) {
-    return Response.json({ success: false, message: "实例名不能为空" }, { status: 400 });
+    return apiFail("实例名不能为空", 400);
   }
 
   if (!/^[a-zA-Z0-9._-]{1,64}$/.test(displayName)) {
-    return Response.json({ success: false, message: "实例名只允许 1-64 位字母、数字、点、下划线、短横线" }, { status: 400 });
+    return apiFail("实例名只允许 1-64 位字母、数字、点、下划线、短横线", 400);
   }
 
   const loginMode = body.loginMode || (body.sshAuthorizedKeys?.trim() ? "manual-ssh" : "generated-ssh");
 
   if ((loginMode === "manual-ssh" || loginMode === "generated-ssh") && !isSshKeyFormatValid(body.sshAuthorizedKeys)) {
-    return Response.json({ success: false, message: "SSH 公钥格式不正确，请粘贴标准 ssh-rsa / ssh-ed25519 / ecdsa 公钥" }, { status: 400 });
+    return apiFail("SSH 公钥格式不正确，请粘贴标准 ssh-rsa / ssh-ed25519 / ecdsa 公钥", 400);
   }
 
   if (loginMode === "password") {
     if (!isSafeUsername(body.username)) {
-      return Response.json({ success: false, message: "用户名格式不合法，请使用 1-32 位字母、数字、下划线或短横线，并以字母或下划线开头" }, { status: 400 });
+      return apiFail("用户名格式不合法，请使用 1-32 位字母、数字、下划线或短横线，并以字母或下划线开头", 400);
     }
     if (!isStrongEnoughPassword(body.password)) {
-      return Response.json({ success: false, message: "密码至少需要 8 位" }, { status: 400 });
+      return apiFail("密码至少需要 8 位", 400);
     }
   }
 
   const isFlexShape = /flex/i.test(body.shape);
   if (isFlexShape) {
     if (typeof body.ocpus !== "number" || Number.isNaN(body.ocpus) || body.ocpus <= 0) {
-      return Response.json({ success: false, message: "Flex 规格必须填写有效的 OCPU" }, { status: 400 });
+      return apiFail("Flex 规格必须填写有效的 OCPU", 400);
     }
     if (typeof body.memoryInGBs !== "number" || Number.isNaN(body.memoryInGBs) || body.memoryInGBs <= 0) {
-      return Response.json({ success: false, message: "Flex 规格必须填写有效的内存大小（GB）" }, { status: 400 });
+      return apiFail("Flex 规格必须填写有效的内存大小（GB）", 400);
     }
   }
 
   const account = await getAccountById(auth.userId, body.accountId);
 
   if (!account) {
-    return Response.json({ success: false, message: "账户不存在" }, { status: 404 });
+    return apiFail("账户不存在", 404);
+  }
+  if (!account.isActive) {
+    return apiFail("账户已停用，请先启用后再创建实例", 409);
   }
 
   try {
@@ -130,7 +134,7 @@ export async function POST(request: Request) {
     const adsRes = await identityClient.listAvailabilityDomains({ compartmentId: account.tenancy });
     const validAds = new Set((adsRes.items || []).map((item) => item.name).filter(Boolean));
     if (!validAds.has(body.availabilityDomain)) {
-      return Response.json({ success: false, message: "所选可用域不存在或不属于当前账户区域" }, { status: 400 });
+      return apiFail("所选可用域不存在或不属于当前账户区域", 400);
     }
 
     const metadata = body.sshAuthorizedKeys?.trim()
@@ -191,8 +195,7 @@ export async function POST(request: Request) {
       message: `创建请求已提交：${instance?.id || "未知实例ID"}`,
     });
 
-    return Response.json({
-      success: true,
+    return apiOk({
       message: "创建请求已提交",
       instance: {
         id: instance?.id,
@@ -216,6 +219,6 @@ export async function POST(request: Request) {
       message,
     });
 
-    return Response.json({ success: false, message }, { status: 500 });
+    return apiFail(message, 500);
   }
 }

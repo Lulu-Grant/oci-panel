@@ -1,27 +1,24 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import { AccountSelector } from "@/components/accounts/account-selector";
+import { readApiData } from "@/lib/api-client";
 import { readManualCache, writeManualCache } from "@/lib/manual-cache";
 
 interface CreateOptionsResponse {
-  success: boolean;
   account?: { id: string; name: string; region: string };
   availabilityDomains?: Array<{ name: string }>;
   shapes?: Array<{ shape?: string; processorDescription?: string; ocpus?: number; memoryInGBs?: number }>;
   images?: Array<{ id?: string; displayName?: string; operatingSystem?: string; operatingSystemVersion?: string }>;
   vcns?: Array<{ id?: string; displayName?: string; cidrBlock?: string; ipv6CidrBlocks?: string[] }>;
   subnets?: Array<{ id?: string; displayName?: string; vcnId?: string; cidrBlock?: string; ipv6CidrBlock?: string; prohibitPublicIpOnVnic?: boolean }>;
-  message?: string;
 }
 
 interface CapacityResponse {
-  success: boolean;
   services?: Array<{ name?: string; description?: string }>;
   limitValues?: Array<Record<string, unknown>>;
-  message?: string;
 }
 
 interface CreateFormState {
@@ -88,7 +85,7 @@ interface CreatePageCachePayload {
   capacity: CapacityResponse | null;
 }
 
-const CREATE_PREFS_KEY = "oci-panel:create-preferences:v1";
+const CREATE_PREFS_KEY = "oci-panel:create-preferences:v2";
 const CREATE_ACCOUNTS_CACHE_KEY = "oci-panel:create:accounts";
 const createPageCacheKey = (accountId: string) => `oci-panel:create:data:${accountId}`;
 const initialForm: CreateFormState = {
@@ -97,7 +94,7 @@ const initialForm: CreateFormState = {
   shape: "",
   imageId: "",
   subnetId: "",
-  assignPublicIp: true,
+  assignPublicIp: false,
   ipMode: "ipv4",
   sshAuthorizedKeys: "",
   ocpus: "",
@@ -135,10 +132,11 @@ const shapeQuickFilters = [
   { label: "BM", value: "bm." },
 ];
 const templatePresets: TemplatePreset[] = [
-  { key: "light-public", label: "轻量公网机", description: "优先常见 VM 规格，公网 IPv4，适合普通站点或测试机。", matchShape: ["vm", "e2", "e3", "e4", "e5"], assignPublicIp: true, ipMode: "ipv4" },
-  { key: "arm-low-cost", label: "ARM 低成本机", description: "优先 A1/ARM 规格，适合低成本长期运行。", matchShape: ["a1", "arm"], assignPublicIp: true, ipMode: "ipv4" },
-  { key: "flex-custom", label: "Flex 自定义机", description: "优先 Flex 规格，适合手工指定 OCPU 与内存。", matchShape: ["flex"], preferFlex: true, assignPublicIp: true, ipMode: "ipv4" },
-  { key: "dual-stack-test", label: "双栈测试机", description: "优先双栈网络模式，适合 IPv6 / 网络验证。", assignPublicIp: true, ipMode: "dual" },
+  { key: "private-baseline", label: "保守内网机", description: "默认不分配公网 IPv4，适合先创建后再按需开放网络。", matchShape: ["vm", "flex"], assignPublicIp: false, ipMode: "ipv4" },
+  { key: "light-public", label: "轻量公网机", description: "显式启用公网 IPv4，适合普通站点或测试机。", matchShape: ["vm", "e2", "e3", "e4", "e5"], assignPublicIp: true, ipMode: "ipv4" },
+  { key: "arm-low-cost", label: "ARM 低成本机", description: "优先 A1/ARM 规格，默认不开放公网。", matchShape: ["a1", "arm"], assignPublicIp: false, ipMode: "ipv4" },
+  { key: "flex-custom", label: "Flex 自定义机", description: "优先 Flex 规格，适合手工指定 OCPU 与内存。", matchShape: ["flex"], preferFlex: true, assignPublicIp: false, ipMode: "ipv4" },
+  { key: "dual-stack-test", label: "双栈测试机", description: "优先双栈网络模式，适合 IPv6 / 网络验证。", assignPublicIp: false, ipMode: "dual" },
 ];
 
 function isDisplayNameValid(value: string) {
@@ -193,7 +191,7 @@ export default function CreatePage() {
   const [templateMessage, setTemplateMessage] = useState<string | null>(null);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<string | null>(null);
 
-  function hydrateCreateState(createJson: CreateOptionsResponse, nextCapacityData: CapacityResponse | null) {
+  const hydrateCreateState = useCallback((createJson: CreateOptionsResponse, nextCapacityData: CapacityResponse | null) => {
     setData(createJson);
     setCapacityData(nextCapacityData);
     setSubmitMessage(null);
@@ -220,7 +218,7 @@ export default function CreatePage() {
       shape: firstShape,
       imageId: firstImageId,
       subnetId: firstSubnet,
-      assignPublicIp: saved?.assignPublicIp ?? true,
+      assignPublicIp: saved?.assignPublicIp ?? false,
       ipMode: saved?.ipMode ?? "ipv4",
       sshAuthorizedKeys: saved?.sshAuthorizedKeys || "",
       ocpus: saved?.ocpus || "",
@@ -230,19 +228,17 @@ export default function CreatePage() {
       allowRootLogin: saved?.allowRootLogin ?? false,
       enablePasswordAuth: saved?.enablePasswordAuth ?? true,
     });
-  }
+  }, []);
 
-  async function refreshAccountsList() {
+  const refreshAccountsList = useCallback(async () => {
     const res = await fetch("/api/accounts", { cache: "no-store" });
-    const json = await res.json();
-    if (!res.ok) throw new Error(json?.message || "加载账户列表失败");
-    const accountsData = json as AccountOption[];
+    const accountsData = await readApiData<AccountOption[]>(res);
     setAccounts(accountsData);
     writeManualCache(CREATE_ACCOUNTS_CACHE_KEY, accountsData);
     return accountsData;
-  }
+  }, []);
 
-  async function loadCreateResources(accountId: string, mode: "initial" | "refresh" = "initial") {
+  const loadCreateResources = useCallback(async (accountId: string, mode: "initial" | "refresh" = "initial") => {
     try {
       if (mode === "initial") setLoading(true);
       if (mode === "refresh") setRefreshing(true);
@@ -255,11 +251,10 @@ export default function CreatePage() {
         fetch(`/api/capacity${query}`, { cache: "no-store" }),
       ]);
 
-      const createJson = (await createRes.json()) as CreateOptionsResponse;
-      if (!createRes.ok || !createJson.success) throw new Error(createJson.message || "加载创建资源失败");
-
-      const capacityJson = (await capacityRes.json()) as CapacityResponse;
-      const nextCapacityData = capacityRes.ok && capacityJson.success ? capacityJson : null;
+      const createJson = await readApiData<CreateOptionsResponse>(createRes);
+      const nextCapacityData = capacityRes.ok
+        ? await readApiData<CapacityResponse>(capacityRes).catch(() => null)
+        : null;
 
       hydrateCreateState(createJson, nextCapacityData);
       const cache = writeManualCache<CreatePageCachePayload>(createPageCacheKey(accountId), {
@@ -274,7 +269,7 @@ export default function CreatePage() {
       setLoading(false);
       setRefreshing(false);
     }
-  }
+  }, [hydrateCreateState]);
 
   useEffect(() => {
     const cachedAccounts = readManualCache<AccountOption[]>(CREATE_ACCOUNTS_CACHE_KEY);
@@ -302,7 +297,7 @@ export default function CreatePage() {
     }
 
     void init();
-  }, []);
+  }, [refreshAccountsList]);
 
   useEffect(() => {
     if (!selectedAccountId) return;
@@ -316,7 +311,7 @@ export default function CreatePage() {
       return;
     }
     void loadCreateResources(selectedAccountId, "initial");
-  }, [selectedAccountId]);
+  }, [hydrateCreateState, loadCreateResources, selectedAccountId]);
 
   useEffect(() => {
     if (!data) return;
@@ -432,6 +427,7 @@ export default function CreatePage() {
   const runtimeWarnings = useMemo(() => {
     const warnings: string[] = [];
     if (form.ipMode === "dual" && !subnetSupportsIpv6) warnings.push("当前 VCN/Subnet 未发现 IPv6 配置，双栈创建可能失败或无法分配 IPv6。");
+    if (!form.assignPublicIp) warnings.push("当前默认不分配公网 IPv4；如需外网直连，请明确开启公网 IP 并确认安全组规则。");
     if (form.assignPublicIp && selectedSubnet?.prohibitPublicIpOnVnic) warnings.push("当前 Subnet 标记为默认禁止公网 IP，即使勾选分配公网 IPv4，也可能被网络策略阻止。");
     if (isFlexShape && (!form.ocpus || !form.memoryInGBs)) warnings.push("当前为 Flex Shape，建议明确填写 OCPU 与内存，避免提交前校验失败。");
     if (capacityData && !computeService) warnings.push("额度页未识别到 compute 服务，当前无法给出更细的创建容量提示。");
@@ -444,8 +440,7 @@ export default function CreatePage() {
     try {
       setGeneratedKeyLoading(true);
       const res = await fetch("/api/ssh-keypair", { method: "POST" });
-      const json = await res.json();
-      if (!res.ok || !json.success) throw new Error(json.message || "生成 SSH Key 失败");
+      const json = await readApiData<{ publicKey: string; privateKey: string }>(res);
       setForm((prev) => ({ ...prev, sshAuthorizedKeys: json.publicKey, loginMode: "generated-ssh" }));
       setGeneratedPrivateKey(json.privateKey || "");
       setTemplateMessage("已自动生成新的 SSH Key，请立即下载并妥善保存私钥。");
@@ -508,8 +503,7 @@ export default function CreatePage() {
       }
       const payload = { accountId: data?.account?.id, availabilityDomain: form.availabilityDomain, subnetId: form.subnetId, imageId: form.imageId, shape: form.shape, displayName: form.displayName, assignPublicIp: form.assignPublicIp, ipMode: form.ipMode, sshAuthorizedKeys: form.loginMode === "password" ? undefined : form.sshAuthorizedKeys, ocpus: isFlexShape && form.ocpus ? Number(form.ocpus) : undefined, memoryInGBs: isFlexShape && form.memoryInGBs ? Number(form.memoryInGBs) : undefined, loginMode: form.loginMode, username: form.loginMode === "password" ? form.username : undefined, password: form.loginMode === "password" ? form.password : undefined, allowRootLogin: form.loginMode === "password" ? form.allowRootLogin : undefined, enablePasswordAuth: form.loginMode === "password" ? form.enablePasswordAuth : undefined };
       const res = await fetch("/api/instances/create", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-      const json = (await res.json()) as { success?: boolean; message?: string; instance?: { id?: string; name?: string } };
-      if (!res.ok || !json.success) throw new Error(json.message || "创建实例失败");
+      const json = await readApiData<{ message?: string; instance?: { id?: string; name?: string } }>(res);
       setSubmitMessage(`创建已提交：${json.instance?.name || form.displayName}${json.instance?.id ? `（${json.instance.id}）` : ""}`);
       setForm((prev) => ({ ...prev, displayName: "", ocpus: prev.ocpus, memoryInGBs: prev.memoryInGBs }));
       setTimeout(() => {

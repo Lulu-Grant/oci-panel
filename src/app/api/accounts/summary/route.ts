@@ -1,11 +1,12 @@
 import { listAccounts, pickDefaultAccount } from "@/lib/accounts-store";
+import { apiFail, apiOk } from "@/lib/api-response";
 import { requireAuthUser } from "@/lib/auth";
 import { createComputeClient } from "@/lib/oci";
 
 export async function GET() {
   const auth = await requireAuthUser();
   if (!auth) {
-    return Response.json({ success: false, message: "未登录" }, { status: 401 });
+    return apiFail("未登录", 401);
   }
 
   const accounts = await listAccounts(auth.userId);
@@ -16,6 +17,21 @@ export async function GET() {
     let stoppedCount = 0;
     let status: "healthy" | "warning" | "error" = account.isActive ? "healthy" : "warning";
     let lastSync = account.updatedAt || "未同步";
+
+    if (!account.isActive) {
+      return {
+        id: account.id,
+        name: account.name,
+        tenancy: account.tenancy,
+        region: account.region,
+        status,
+        instanceCount,
+        runningCount,
+        stoppedCount,
+        lastSync,
+        isDefault: account.isDefault,
+      };
+    }
 
     try {
       const computeClient = await createComputeClient(account);
@@ -50,5 +66,5 @@ export async function GET() {
     return 0;
   });
 
-  return Response.json(sorted);
+  return apiOk(sorted);
 }

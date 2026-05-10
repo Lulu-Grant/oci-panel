@@ -1,4 +1,5 @@
 import { getAccountById } from "@/lib/accounts-store";
+import { apiFail, apiOk } from "@/lib/api-response";
 import { requireAuthUser } from "@/lib/auth";
 import { createBlockstorageClient, createComputeClient, createVirtualNetworkClient } from "@/lib/oci";
 import { InstanceDetailItem } from "@/types/dashboard";
@@ -9,7 +10,7 @@ export async function GET(
 ) {
   const auth = await requireAuthUser();
   if (!auth) {
-    return Response.json({ success: false, message: "未登录" }, { status: 401 });
+    return apiFail("未登录", 401);
   }
 
   const { searchParams } = new URL(request.url);
@@ -17,17 +18,20 @@ export async function GET(
   const { instanceId } = await context.params;
 
   if (!accountId) {
-    return Response.json({ success: false, message: "缺少 accountId" }, { status: 400 });
+    return apiFail("缺少 accountId", 400);
   }
 
   if (!instanceId) {
-    return Response.json({ success: false, message: "缺少 instanceId" }, { status: 400 });
+    return apiFail("缺少 instanceId", 400);
   }
 
   const account = await getAccountById(auth.userId, accountId);
 
   if (!account) {
-    return Response.json({ success: false, message: "账户不存在" }, { status: 404 });
+    return apiFail("账户不存在", 404);
+  }
+  if (!account.isActive) {
+    return apiFail("账户已停用，请先启用后再读取实例详情", 409);
   }
 
   try {
@@ -86,12 +90,9 @@ export async function GET(
       vcnIpv6CidrBlocks: networking.vcnIpv6CidrBlocks || [],
     };
 
-    return Response.json({ success: true, detail });
+    return apiOk({ detail });
   } catch (error) {
-    return Response.json(
-      { success: false, message: error instanceof Error ? error.message : "加载实例详情失败" },
-      { status: 500 }
-    );
+    return apiFail(error instanceof Error ? error.message : "加载实例详情失败", 500);
   }
 }
 

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { readApiData } from "@/lib/api-client";
 import { CreateAccountPayload } from "@/types/accounts";
 
 function parseOracleConfigText(raw: string): Partial<CreateAccountPayload> {
@@ -105,11 +106,7 @@ export function AddAccountForm({
         body: JSON.stringify(payload),
       });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data?.message || "保存账户失败");
-      }
+      const data = await readApiData<{ id: string }>(res);
 
       setMessage("账户已保存");
       setForm(initialForm);

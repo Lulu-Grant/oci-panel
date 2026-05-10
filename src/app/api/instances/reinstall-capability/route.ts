@@ -1,11 +1,12 @@
 import { getAccountById } from "@/lib/accounts-store";
+import { apiFail, apiOk } from "@/lib/api-response";
 import { requireAuthUser } from "@/lib/auth";
 import { createOsManagementHubManagedInstanceClient } from "@/lib/oci";
 
 export async function GET(request: Request) {
   const auth = await requireAuthUser();
   if (!auth) {
-    return Response.json({ success: false, message: "未登录" }, { status: 401 });
+    return apiFail("未登录", 401);
   }
 
   const { searchParams } = new URL(request.url);
@@ -13,12 +14,15 @@ export async function GET(request: Request) {
   const instanceId = searchParams.get("instanceId");
 
   if (!accountId || !instanceId) {
-    return Response.json({ success: false, message: "缺少 accountId 或 instanceId" }, { status: 400 });
+    return apiFail("缺少 accountId 或 instanceId", 400);
   }
 
   const account = await getAccountById(auth.userId, accountId);
   if (!account) {
-    return Response.json({ success: false, message: "账户不存在" }, { status: 404 });
+    return apiFail("账户不存在", 404);
+  }
+  if (!account.isActive) {
+    return apiFail("账户已停用，请先启用后再检测托管能力", 409);
   }
 
   try {
@@ -33,16 +37,14 @@ export async function GET(request: Request) {
     const matched = directItems[0];
 
     if (!matched) {
-      return Response.json({
-        success: true,
+      return apiOk({
         supported: false,
         mode: "os-management-hub",
         reason: "当前实例未出现在 OS Management Hub 的 managed instances 中，可能尚未启用代理、未注册托管实例或权限不足。",
       });
     }
 
-    return Response.json({
-      success: true,
+    return apiOk({
       supported: true,
       mode: "os-management-hub",
       managedInstanceId: String(matched.id || matched.managedInstanceId || instanceId),
@@ -52,6 +54,6 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "检测 OCI 原生命令执行能力失败";
-    return Response.json({ success: false, supported: false, mode: "os-management-hub", message }, { status: 500 });
+    return apiFail(message, 500);
   }
 }

@@ -1,4 +1,5 @@
 import { getAccountById } from "@/lib/accounts-store";
+import { apiFail, apiOk } from "@/lib/api-response";
 import { requireAuthUser } from "@/lib/auth";
 import { appendLog } from "@/lib/logs-store";
 import { createIdentityClient } from "@/lib/oci";
@@ -6,20 +7,23 @@ import { createIdentityClient } from "@/lib/oci";
 export async function POST(request: Request) {
   const auth = await requireAuthUser();
   if (!auth) {
-    return Response.json({ success: false, message: "未登录" }, { status: 401 });
+    return apiFail("未登录", 401);
   }
 
   const body = await request.json();
   const accountId = body?.accountId as string | undefined;
 
   if (!accountId) {
-    return Response.json({ success: false, message: "缺少 accountId" }, { status: 400 });
+    return apiFail("缺少 accountId", 400);
   }
 
   const account = await getAccountById(auth.userId, accountId);
 
   if (!account) {
-    return Response.json({ success: false, message: "账户不存在" }, { status: 404 });
+    return apiFail("账户不存在", 404);
+  }
+  if (!account.isActive) {
+    return apiFail("账户已停用，请先启用后再测试连接", 409);
   }
 
   try {
@@ -38,8 +42,7 @@ export async function POST(request: Request) {
       message: `连接测试成功：${response.tenancy.name}`,
     });
 
-    return Response.json({
-      success: true,
+    return apiOk({
       tenancyName: response.tenancy.name,
       tenancyId: response.tenancy.id,
       region: account.region,
@@ -60,6 +63,6 @@ export async function POST(request: Request) {
       message,
     });
 
-    return Response.json({ success: false, message }, { status: 500 });
+    return apiFail(message, 500);
   }
 }

@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { AccountSelector } from "@/components/accounts/account-selector";
 import { QuickActions } from "@/components/dashboard/quick-actions";
 import { RecentActivity } from "@/components/dashboard/recent-activity";
 import { StatCard } from "@/components/dashboard/stat-card";
+import { readApiData } from "@/lib/api-client";
 import { readManualCache, writeManualCache } from "@/lib/manual-cache";
 import { DashboardData } from "@/types/dashboard";
 
@@ -26,18 +27,17 @@ export default function Home() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<string | null>(null);
+  const initializedRef = useRef(false);
 
-  async function refreshAccountsList() {
+  const refreshAccountsList = useCallback(async () => {
     const res = await fetch("/api/accounts", { cache: "no-store" });
-    const json = await res.json();
-    if (!res.ok) throw new Error(json?.message || "加载账户列表失败");
-    const accountsData = json as AccountOption[];
+    const accountsData = await readApiData<AccountOption[]>(res);
     setAccounts(accountsData);
     writeManualCache(ACCOUNTS_CACHE_KEY, accountsData);
     return accountsData;
-  }
+  }, []);
 
-  async function refreshDashboard(accountId: string, mode: "initial" | "refresh" = "refresh") {
+  const refreshDashboard = useCallback(async (accountId: string, mode: "initial" | "refresh" = "refresh") => {
     try {
       if (mode === "initial") setLoading(true);
       if (mode === "refresh") setRefreshing(true);
@@ -59,10 +59,9 @@ export default function Home() {
 
       const query = `?accountId=${encodeURIComponent(accountId)}`;
       const res = await fetch(`/api/dashboard${query}`, { cache: "no-store" });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json?.message || "加载控制台数据失败");
-      setData(json as DashboardData);
-      const cache = writeManualCache(dashboardCacheKey(accountId), json as DashboardData);
+      const dashboard = await readApiData<DashboardData>(res);
+      setData(dashboard);
+      const cache = writeManualCache(dashboardCacheKey(accountId), dashboard);
       setLastRefreshedAt(cache?.refreshedAt || new Date().toISOString());
     } catch (err) {
       setError(err instanceof Error ? err.message : "未知错误");
@@ -70,9 +69,12 @@ export default function Home() {
       setLoading(false);
       setRefreshing(false);
     }
-  }
+  }, [accounts, refreshAccountsList]);
 
   useEffect(() => {
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+
     const cachedAccounts = readManualCache<AccountOption[]>(ACCOUNTS_CACHE_KEY);
     const initialAccounts = cachedAccounts?.data || [];
     if (initialAccounts.length > 0) {
@@ -90,7 +92,7 @@ export default function Home() {
       return;
     }
     void refreshDashboard("", "initial");
-  }, []);
+  }, [refreshDashboard]);
 
   useEffect(() => {
     if (!selectedAccountId) return;
@@ -103,10 +105,10 @@ export default function Home() {
       return;
     }
     void refreshDashboard(selectedAccountId, "initial");
-  }, [selectedAccountId]);
+  }, [refreshDashboard, selectedAccountId]);
 
-  const instances = data?.instances ?? [];
-  const logs = data?.logs ?? [];
+  const instances = useMemo(() => data?.instances ?? [], [data?.instances]);
+  const logs = useMemo(() => data?.logs ?? [], [data?.logs]);
   const selectedAccount = useMemo(() => accounts.find((item) => item.id === selectedAccountId), [accounts, selectedAccountId]);
 
   const stats = useMemo(() => {
@@ -120,6 +122,23 @@ export default function Home() {
 
     return { running, stopped, publicCount, dualStackCount, flexCount, riskCount, failedOps };
   }, [instances, logs]);
+
+  const commandItems = useMemo(() => {
+    const items: Array<{ label: string; detail: string; href: string; tone: "rose" | "amber" | "blue" | "emerald" }> = [];
+    if (stats.failedOps > 0) {
+      items.push({ label: "查看失败操作", detail: `最近有 ${stats.failedOps} 条失败日志，先确认是否需要重试或修正凭据。`, href: "/logs", tone: "rose" });
+    }
+    if (stats.publicCount > 0) {
+      items.push({ label: "复核公网暴露", detail: `${stats.publicCount} 台实例检测到公网 IPv4，建议进入实例页按风险筛选。`, href: `/instances?accountId=${encodeURIComponent(selectedAccountId)}`, tone: "amber" });
+    }
+    if (stats.flexCount > 0) {
+      items.push({ label: "核对 Flex 容量", detail: `${stats.flexCount} 台 Flex 实例，创建新机前建议刷新 Capacity。`, href: "/capacity", tone: "blue" });
+    }
+    if (items.length === 0) {
+      items.push({ label: "继续创建资源", detail: "当前没有突出的失败操作或暴露风险，可以从创建页推进新实例。", href: "/create", tone: "emerald" });
+    }
+    return items.slice(0, 3);
+  }, [selectedAccountId, stats.failedOps, stats.flexCount, stats.publicCount]);
 
   return (
     <AppShell>
@@ -214,7 +233,26 @@ export default function Home() {
               </div>
             </section>
 
-            <QuickActions />
+            <section className="space-y-6">
+              <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-400">下一步处理</p>
+                <h3 className="mt-2 text-xl font-semibold tracking-tight text-slate-900">控制台行动队列</h3>
+                <div className="mt-5 space-y-3">
+                  {commandItems.map((item) => (
+                    <a key={item.label} href={item.href} className={`block rounded-xl border px-4 py-3 text-sm transition hover:-translate-y-0.5 ${
+                      item.tone === "rose" ? "border-rose-200 bg-rose-50 text-rose-800" :
+                      item.tone === "amber" ? "border-amber-200 bg-amber-50 text-amber-800" :
+                      item.tone === "blue" ? "border-blue-200 bg-blue-50 text-blue-800" :
+                      "border-emerald-200 bg-emerald-50 text-emerald-800"
+                    }`}>
+                      <p className="font-semibold">{item.label}</p>
+                      <p className="mt-1 leading-6">{item.detail}</p>
+                    </a>
+                  ))}
+                </div>
+              </section>
+              <QuickActions />
+            </section>
           </div>
 
           <RecentActivity logs={logs} />

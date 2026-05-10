@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { signIn } from "next-auth/react";
+import { readApiData } from "@/lib/api-client";
 
 export default function RegisterPage() {
   const [name, setName] = useState("");
@@ -23,9 +24,10 @@ export default function RegisterPage() {
       body: JSON.stringify({ name, email, password }),
     });
 
-    const data = await res.json();
-    if (!res.ok || !data.success) {
-      setError(data.message || "注册失败");
+    try {
+      await readApiData<{ user: { id: string; email: string; name?: string | null } }>(res);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "注册失败");
       setLoading(false);
       return;
     }

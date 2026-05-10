@@ -1,4 +1,5 @@
 import { listAccounts, pickDefaultAccount } from "@/lib/accounts-store";
+import { apiFail, apiOk } from "@/lib/api-response";
 import { requireAuthUser } from "@/lib/auth";
 import { createComputeClient, createIdentityClient, createVirtualNetworkClient } from "@/lib/oci";
 
@@ -63,7 +64,7 @@ function rankImage(item: {
 export async function GET(request: Request) {
   const auth = await requireAuthUser();
   if (!auth) {
-    return Response.json({ success: false, message: "未登录" }, { status: 401 });
+    return apiFail("未登录", 401);
   }
 
   const { searchParams } = new URL(request.url);
@@ -73,7 +74,10 @@ export async function GET(request: Request) {
   const target = accountId ? accounts.find((item) => item.id === accountId) : pickDefaultAccount(accounts);
 
   if (!target) {
-    return Response.json({ success: false, message: "没有可用账户" }, { status: 404 });
+    return apiFail("没有可用账户", 404);
+  }
+  if (!target.isActive) {
+    return apiFail("账户已停用，请先启用后再加载创建资源", 409);
   }
 
   try {
@@ -124,8 +128,7 @@ export async function GET(request: Request) {
         operatingSystemVersion: item.operatingSystemVersion,
       }));
 
-    return Response.json({
-      success: true,
+    return apiOk({
       account: {
         id: target.id,
         name: target.name,
@@ -156,6 +159,6 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "加载创建实例资源失败";
-    return Response.json({ success: false, message }, { status: 500 });
+    return apiFail(message, 500);
   }
 }

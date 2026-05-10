@@ -3,16 +3,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { AccountSelector } from "@/components/accounts/account-selector";
+import { readApiData } from "@/lib/api-client";
 import { readManualCache, writeManualCache } from "@/lib/manual-cache";
 
 interface CapacityResponse {
-  success: boolean;
   account?: { id: string; name: string; region: string };
   regions?: Array<{ regionName?: string; regionKey?: string; status?: string }>;
   availabilityDomains?: Array<{ name?: string }>;
   services?: Array<{ name?: string; description?: string }>;
   limitValues?: Array<Record<string, unknown>>;
-  message?: string;
 }
 
 interface ParsedLimitValue {
@@ -48,9 +47,7 @@ export default function CapacityPage() {
 
   async function refreshAccountsList() {
     const res = await fetch("/api/accounts", { cache: "no-store" });
-    const json = await res.json();
-    if (!res.ok) throw new Error(json?.message || "加载账户列表失败");
-    const accountsData = json as AccountOption[];
+    const accountsData = await readApiData<AccountOption[]>(res);
     setAccounts(accountsData);
     writeManualCache(ACCOUNTS_CACHE_KEY, accountsData);
     return accountsData;
@@ -64,8 +61,7 @@ export default function CapacityPage() {
       setServiceFilter("全部服务");
       const query = accountId ? `?accountId=${encodeURIComponent(accountId)}` : "";
       const res = await fetch(`/api/capacity${query}`, { cache: "no-store" });
-      const json = (await res.json()) as CapacityResponse;
-      if (!res.ok || !json.success) throw new Error(json.message || "加载额度信息失败");
+      const json = await readApiData<CapacityResponse>(res);
       setData(json);
       const cache = writeManualCache(capacityCacheKey(accountId), json);
       setLastRefreshedAt(cache?.refreshedAt || new Date().toISOString());
@@ -135,6 +131,20 @@ export default function CapacityPage() {
     return parsedLimitValues.filter((item) => /(core|ocpu|vm|instance|compute|memory|a1|e2|e3|e4|e5|flex)/i.test(item.name));
   }, [parsedLimitValues]);
 
+  const priorityComputeLimits = useMemo(() => {
+    const groups = [
+      { key: "a1", label: "A1 / ARM", pattern: /(a1|arm)/i },
+      { key: "flex", label: "Flex Shape", pattern: /(flex|e3|e4|e5)/i },
+      { key: "ocpu", label: "OCPU / Core", pattern: /(ocpu|core)/i },
+      { key: "memory", label: "Memory", pattern: /memory/i },
+    ];
+
+    return groups.map((group) => ({
+      ...group,
+      items: computeFocusedLimits.filter((item) => group.pattern.test(`${item.name} ${item.scopeType} ${item.availabilityDomain}`)).slice(0, 3),
+    }));
+  }, [computeFocusedLimits]);
+
   const filteredLimits = useMemo(() => {
     if (serviceFilter === "全部服务") return parsedLimitValues;
     if (serviceFilter === "Compute 重点") return computeFocusedLimits;
@@ -185,6 +195,28 @@ export default function CapacityPage() {
             <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p className="text-xs uppercase tracking-[0.16em] text-slate-400">全部额度项</p><p className="mt-2 text-3xl font-semibold text-slate-900">{overview.limitCount}</p></section>
             <section className="rounded-2xl border border-blue-200 bg-blue-50 p-5 shadow-sm"><p className="text-xs uppercase tracking-[0.16em] text-blue-500">Compute 重点</p><p className="mt-2 text-3xl font-semibold text-blue-900">{overview.computeLimitCount}</p></section>
           </div>
+
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-400">创建前重点</p>
+            <h3 className="mt-2 text-xl font-semibold tracking-tight text-slate-900">A1 / Flex / OCPU / Memory 快速核对</h3>
+            <div className="mt-5 grid gap-4 lg:grid-cols-4">
+              {priorityComputeLimits.map((group) => (
+                <div key={group.key} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm font-semibold text-slate-900">{group.label}</p>
+                  <div className="mt-3 space-y-2">
+                    {group.items.length > 0 ? group.items.map((item) => (
+                      <div key={`${group.key}-${item.name}-${item.availabilityDomain}`} className="rounded-xl border border-white bg-white px-3 py-2 text-xs text-slate-600">
+                        <p className="font-medium text-slate-900">{item.name}</p>
+                        <p className="mt-1">{item.availabilityDomain} · 值 {item.value}</p>
+                      </div>
+                    )) : (
+                      <p className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-xs text-slate-500">未识别到相关额度项</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
 
           <div className="grid gap-8 lg:grid-cols-2">
             <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">

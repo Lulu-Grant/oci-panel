@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { readApiData } from "@/lib/api-client";
 import { CreateAccountPayload } from "@/types/accounts";
 import { AccountItem } from "@/types/dashboard";
 
@@ -30,27 +31,30 @@ export function EditAccountForm({
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [keepExistingKey, setKeepExistingKey] = useState(true);
+  const [replaceCredential, setReplaceCredential] = useState(false);
+  const [hasStoredPrivateKey, setHasStoredPrivateKey] = useState(false);
+  const [hasStoredPassphrase, setHasStoredPassphrase] = useState(false);
 
   useEffect(() => {
     async function load() {
       try {
         setLoading(true);
         const res = await fetch(`/api/accounts?accountId=${encodeURIComponent(accountId)}`, { cache: "no-store" });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data?.message || "加载账户详情失败");
+        const data = await readApiData<CreateAccountPayload & { hasPrivateKey?: boolean; hasPassphrase?: boolean; isActive?: boolean }>(res);
         setForm({
           name: data.name || "",
           tenancy: data.tenancy || "",
           userOcid: data.userOcid || "",
           fingerprint: data.fingerprint || "",
-          privateKey: data.privateKey || "",
+          privateKey: "",
           keyFilePath: data.keyFilePath || "",
           region: data.region || "ap-singapore-1",
-          passphrase: data.passphrase || "",
+          passphrase: "",
           description: data.description || "",
           isDefault: Boolean(data.isDefault),
         });
+        setHasStoredPrivateKey(Boolean(data.hasPrivateKey));
+        setHasStoredPassphrase(Boolean(data.hasPassphrase));
       } catch (error) {
         setMessage(error instanceof Error ? error.message : "加载账户详情失败");
       } finally {
@@ -65,14 +69,18 @@ export function EditAccountForm({
     setSubmitting(true);
     setMessage(null);
     try {
-      const payload = { ...form, privateKey: keepExistingKey ? form.privateKey : form.privateKey };
+      const payload = {
+        ...form,
+        replaceCredential,
+        privateKey: replaceCredential ? form.privateKey : undefined,
+        passphrase: replaceCredential ? form.passphrase : undefined,
+      };
       const res = await fetch("/api/accounts", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ accountId, action: "update", ...payload }),
       });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data?.message || "更新账户失败");
+      await readApiData<{ accountId: string }>(res);
       onSaved({
         id: accountId,
         name: payload.name,
@@ -112,15 +120,17 @@ export function EditAccountForm({
             <input className="rounded-xl border border-slate-200 px-4 py-3 text-sm" placeholder="User OCID" value={form.userOcid} onChange={(e) => setForm({ ...form, userOcid: e.target.value })} />
             <input className="rounded-xl border border-slate-200 px-4 py-3 text-sm" placeholder="Fingerprint" value={form.fingerprint} onChange={(e) => setForm({ ...form, fingerprint: e.target.value })} />
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-              <label className="flex items-center gap-2"><input type="checkbox" checked={keepExistingKey} onChange={(e) => setKeepExistingKey(e.target.checked)} /> 保留现有私钥</label>
-              <p className="mt-2 text-xs text-slate-500">默认不直接展开完整私钥，只有你明确需要替换时再粘贴新私钥。</p>
+              <label className="flex items-center gap-2"><input type="checkbox" checked={replaceCredential} onChange={(e) => setReplaceCredential(e.target.checked)} /> 替换 OCI API 凭据</label>
+              <p className="mt-2 text-xs text-slate-500">
+                当前账户{hasStoredPrivateKey ? "已保存私钥" : "未保存私钥正文"}{hasStoredPassphrase ? "，并保存了 Passphrase" : ""}。默认只更新元数据，不会把既有私钥返回到浏览器。
+              </p>
             </div>
-            {!keepExistingKey ? <textarea className="min-h-40 rounded-xl border border-slate-200 px-4 py-3 text-sm" placeholder="Private Key（可直接粘贴 PEM 内容）" value={form.privateKey} onChange={(e) => setForm({ ...form, privateKey: e.target.value })} /> : null}
+            {replaceCredential ? <textarea className="min-h-40 rounded-xl border border-slate-200 px-4 py-3 text-sm" placeholder="Private Key（可直接粘贴新的 PEM 内容）" value={form.privateKey} onChange={(e) => setForm({ ...form, privateKey: e.target.value })} /> : null}
             <input className="rounded-xl border border-slate-200 px-4 py-3 text-sm" placeholder="Key 文件路径（可选）" value={form.keyFilePath} onChange={(e) => setForm({ ...form, keyFilePath: e.target.value })} />
-            <input className="rounded-xl border border-slate-200 px-4 py-3 text-sm" placeholder="Passphrase（可选）" value={form.passphrase} onChange={(e) => setForm({ ...form, passphrase: e.target.value })} />
+            {replaceCredential ? <input className="rounded-xl border border-slate-200 px-4 py-3 text-sm" placeholder="Passphrase（可选，新凭据需要时填写）" value={form.passphrase} onChange={(e) => setForm({ ...form, passphrase: e.target.value })} /> : null}
             <input className="rounded-xl border border-slate-200 px-4 py-3 text-sm" placeholder="备注（可选）" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
             <label className="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked={Boolean(form.isDefault)} onChange={(e) => setForm({ ...form, isDefault: e.target.checked })} />设为默认账户</label>
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">编辑时同样支持二选一：保留原私钥，或显式替换为新私钥 / key 文件路径。</div>
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">编辑账户默认保留服务端已有凭据。只有勾选“替换 OCI API 凭据”时，才会提交新的私钥或 key 文件路径。</div>
             <div className="flex items-center gap-3">
               <button className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50" disabled={submitting}>{submitting ? "保存中..." : "保存修改"}</button>
               <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">取消</button>

@@ -1,4 +1,5 @@
 import { listAccounts, pickDefaultAccount } from "@/lib/accounts-store";
+import { apiFail, apiOk } from "@/lib/api-response";
 import { requireAuthUser } from "@/lib/auth";
 import { createComputeClient, createVirtualNetworkClient } from "@/lib/oci";
 import { InstanceItem } from "@/types/dashboard";
@@ -6,7 +7,7 @@ import { InstanceItem } from "@/types/dashboard";
 export async function GET(request: Request) {
   const auth = await requireAuthUser();
   if (!auth) {
-    return Response.json({ success: false, message: "未登录" }, { status: 401 });
+    return apiFail("未登录", 401);
   }
 
   const { searchParams } = new URL(request.url);
@@ -15,11 +16,15 @@ export async function GET(request: Request) {
   const accounts = await listAccounts(auth.userId);
   const defaultAccount = pickDefaultAccount(accounts);
   const targetAccounts = accountId
-    ? accounts.filter((item) => item.id === accountId)
+    ? accounts.filter((item) => item.id === accountId && item.isActive)
     : (defaultAccount ? [defaultAccount] : []);
 
+  if (accountId && accounts.some((item) => item.id === accountId && !item.isActive)) {
+    return apiFail("账户已停用，请先启用后再读取实例", 409);
+  }
+
   if (targetAccounts.length === 0) {
-    return Response.json([]);
+    return apiOk([]);
   }
 
   const results: InstanceItem[] = [];
@@ -76,7 +81,7 @@ export async function GET(request: Request) {
     }
   }
 
-  return Response.json(results);
+  return apiOk(results);
 }
 
 async function getInstanceNetworking(

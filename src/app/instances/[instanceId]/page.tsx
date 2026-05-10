@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { useToast } from "@/components/ui/toast";
 import { InstanceDetailContent } from "@/components/instances/instance-detail-content";
+import { readApiData } from "@/lib/api-client";
 import { InstanceDetailItem, InstancePollingMeta } from "@/types/dashboard";
 
 const actionMap = {
@@ -54,7 +55,7 @@ export default function InstanceDetailPage({
     };
   }, []);
 
-  async function loadDetail(targetAccountId: string, targetInstanceId: string, options?: { silent?: boolean }) {
+  const loadDetail = useCallback(async (targetAccountId: string, targetInstanceId: string, options?: { silent?: boolean }) => {
     if (!targetAccountId || !targetInstanceId) return null;
     if (!options?.silent) setLoading(true);
     setError(null);
@@ -62,10 +63,8 @@ export default function InstanceDetailPage({
       const res = await fetch(`/api/instances/${encodeURIComponent(targetInstanceId)}?accountId=${encodeURIComponent(targetAccountId)}`, {
         cache: "no-store",
       });
-      const data = (await res.json()) as { success?: boolean; message?: string; detail?: InstanceDetailItem };
-      if (!res.ok || !data.success || !data.detail) {
-        throw new Error(data.message || "加载实例详情失败");
-      }
+      const data = await readApiData<{ detail?: InstanceDetailItem }>(res);
+      if (!data.detail) throw new Error("加载实例详情失败");
       setDetail(data.detail);
       setPolling((prev) => ({ ...prev, lastUpdatedAt: new Date().toISOString() }));
       return data.detail;
@@ -76,9 +75,9 @@ export default function InstanceDetailPage({
     } finally {
       if (!options?.silent) setLoading(false);
     }
-  }
+  }, []);
 
-  function stopPolling(message?: string) {
+  const stopPolling = useCallback((message?: string) => {
     if (pollingTimerRef.current) {
       clearTimeout(pollingTimerRef.current);
       pollingTimerRef.current = null;
@@ -89,9 +88,11 @@ export default function InstanceDetailPage({
       isPolling: false,
       pollingMessage: message || prev.pollingMessage,
     }));
-  }
+  }, []);
 
-  function schedulePolling(targetAccountId: string, targetInstanceId: string) {
+  const evaluatePollingRef = useRef<(currentDetail: InstanceDetailItem, targetAccountId: string, targetInstanceId: string) => void>(() => undefined);
+
+  const schedulePolling = useCallback((targetAccountId: string, targetInstanceId: string) => {
     if (pollingTimerRef.current) clearTimeout(pollingTimerRef.current);
     pollingTimerRef.current = setTimeout(async () => {
       const nextDetail = await loadDetail(targetAccountId, targetInstanceId, { silent: true });
@@ -99,11 +100,11 @@ export default function InstanceDetailPage({
         stopPolling("状态跟踪已停止：刷新详情失败");
         return;
       }
-      evaluatePolling(nextDetail, targetAccountId, targetInstanceId);
+      evaluatePollingRef.current(nextDetail, targetAccountId, targetInstanceId);
     }, POLL_INTERVAL_MS);
-  }
+  }, [loadDetail, stopPolling]);
 
-  function evaluatePolling(currentDetail: InstanceDetailItem, targetAccountId: string, targetInstanceId: string) {
+  const evaluatePolling = useCallback((currentDetail: InstanceDetailItem, targetAccountId: string, targetInstanceId: string) => {
     const rawState = currentDetail.lifecycleStateRaw || "UNKNOWN";
 
     if (STABLE_STATES.has(rawState)) {
@@ -131,7 +132,11 @@ export default function InstanceDetailPage({
       pollingMessage: `正在自动跟踪实例状态：${rawState}`,
     }));
     schedulePolling(targetAccountId, targetInstanceId);
-  }
+  }, [schedulePolling, stopPolling]);
+
+  useEffect(() => {
+    evaluatePollingRef.current = evaluatePolling;
+  }, [evaluatePolling]);
 
   useEffect(() => {
     async function bootstrap() {
@@ -154,7 +159,7 @@ export default function InstanceDetailPage({
     }
 
     void bootstrap();
-  }, [accountId, instanceId, trackMode]);
+  }, [accountId, evaluatePolling, instanceId, loadDetail, trackMode]);
 
   async function handleAction(label: keyof typeof actionMap) {
     if (!accountId || !instanceId) return;
@@ -170,16 +175,15 @@ export default function InstanceDetailPage({
         }),
       });
 
-      const data = await res.json();
-      pushToast({ tone: data.success ? "success" : "error", message: data.success ? `${label} 已提交：${data.status || "OK"}` : `操作失败：${data.message}` });
-
-      if (data.success) {
-        const nextDetail = await loadDetail(accountId, instanceId);
-        if (nextDetail) {
-          pollingStartedAtRef.current = Date.now();
-          evaluatePolling(nextDetail, accountId, instanceId);
-        }
+      const data = await readApiData<{ status?: string }>(res);
+      pushToast({ tone: "success", message: `${label} 已提交：${data.status || "OK"}` });
+      const nextDetail = await loadDetail(accountId, instanceId);
+      if (nextDetail) {
+        pollingStartedAtRef.current = Date.now();
+        evaluatePolling(nextDetail, accountId, instanceId);
       }
+    } catch (error) {
+      pushToast({ tone: "error", message: error instanceof Error ? `操作失败：${error.message}` : "操作失败" });
     } finally {
       setActing(false);
     }

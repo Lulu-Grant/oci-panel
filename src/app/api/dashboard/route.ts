@@ -1,4 +1,5 @@
 import { listAccounts, pickDefaultAccount } from "@/lib/accounts-store";
+import { apiFail, apiOk } from "@/lib/api-response";
 import { requireAuthUser } from "@/lib/auth";
 import { listLogs } from "@/lib/logs-store";
 import { createComputeClient, createVirtualNetworkClient } from "@/lib/oci";
@@ -7,7 +8,7 @@ import { DashboardData, InstanceItem } from "@/types/dashboard";
 export async function GET(request: Request) {
   const auth = await requireAuthUser();
   if (!auth) {
-    return Response.json({ success: false, message: "未登录" }, { status: 401 });
+    return apiFail("未登录", 401);
   }
 
   const { searchParams } = new URL(request.url);
@@ -17,9 +18,13 @@ export async function GET(request: Request) {
   const selectedAccount = accountId ? accounts.find((item) => item.id === accountId) : pickDefaultAccount(accounts);
   const logs = await listLogs(auth.userId);
 
+  if (selectedAccount && !selectedAccount.isActive) {
+    return apiFail("账户已停用，请先启用后再读取控制台数据", 409);
+  }
+
   if (!selectedAccount) {
     const empty: DashboardData = { accounts: [], instances: [], logs: logs.slice(0, 8) };
-    return Response.json(empty);
+    return apiOk(empty);
   }
 
   const instances: InstanceItem[] = [];
@@ -93,7 +98,7 @@ export async function GET(request: Request) {
     logs: logs.filter((item) => item.account === selectedAccount.name).slice(0, 8),
   };
 
-  return Response.json(dashboard);
+  return apiOk(dashboard);
 }
 
 async function getInstanceNetworking(

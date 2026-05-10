@@ -1,4 +1,5 @@
 import { generateKeyPairSync } from "node:crypto";
+import { apiFail, apiOk } from "@/lib/api-response";
 
 function encodeSshString(input: Buffer | string) {
   const buffer = Buffer.isBuffer(input) ? input : Buffer.from(input, "utf8");
@@ -25,13 +26,12 @@ export async function POST() {
     const rawEd25519PublicKey = publicKeyDer.subarray(-32);
     const publicKeyOpenSsh = toOpenSshEd25519PublicKey(rawEd25519PublicKey);
 
-    return Response.json({
-      success: true,
+    return apiOk({
       publicKey: publicKeyOpenSsh,
       privateKey: typeof privateKeyPem === "string" ? privateKeyPem : privateKeyPem.toString(),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "生成 SSH key 失败";
-    return Response.json({ success: false, message }, { status: 500 });
+    return apiFail(message, 500);
   }
 }

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { AccountSelector } from "@/components/accounts/account-selector";
 import { InstancesTable } from "@/components/instances/instances-table";
+import { readApiData } from "@/lib/api-client";
 import { readManualCache, writeManualCache } from "@/lib/manual-cache";
 import { InstanceItem } from "@/types/dashboard";
 
@@ -38,9 +39,7 @@ export default function InstancesPage() {
 
   async function refreshAccountsList() {
     const res = await fetch("/api/accounts", { cache: "no-store" });
-    const json = await res.json();
-    if (!res.ok) throw new Error(json?.message || "加载账户列表失败");
-    const accountsData = json as AccountOption[];
+    const accountsData = await readApiData<AccountOption[]>(res);
     setAccounts(accountsData);
     writeManualCache(ACCOUNTS_CACHE_KEY, accountsData);
     return accountsData;
@@ -54,10 +53,9 @@ export default function InstancesPage() {
       setStaleHint(null);
       const query = accountId ? `?accountId=${encodeURIComponent(accountId)}` : "";
       const res = await fetch(`/api/instances${query}`, { cache: "no-store" });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json?.message || "加载实例列表失败");
-      setInstances(json as InstanceItem[]);
-      const cache = writeManualCache(instancesCacheKey(accountId), json as InstanceItem[]);
+      const instanceData = await readApiData<InstanceItem[]>(res);
+      setInstances(instanceData);
+      const cache = writeManualCache(instancesCacheKey(accountId), instanceData);
       setLastRefreshedAt(cache?.refreshedAt || new Date().toISOString());
     } catch (err) {
       setError(err instanceof Error ? err.message : "未知错误");

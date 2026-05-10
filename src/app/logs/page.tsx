@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { LogsTable } from "@/components/logs/logs-table";
 import { formatDateTimeWithRelative } from "@/lib/format";
+import { readApiData } from "@/lib/api-client";
 import { readManualCache, writeManualCache } from "@/lib/manual-cache";
 import { LogItem } from "@/types/dashboard";
 
@@ -22,8 +23,7 @@ export default function LogsPage() {
       if (mode === "refresh") setRefreshing(true);
       setError(null);
       const res = await fetch("/api/logs", { cache: "no-store" });
-      const json = (await res.json()) as LogItem[];
-      if (!res.ok) throw new Error("加载日志失败");
+      const json = await readApiData<LogItem[]>(res);
       setLogs(json);
       const cache = writeManualCache(LOGS_CACHE_KEY, json);
       setLastRefreshedAt(cache?.refreshedAt || new Date().toISOString());

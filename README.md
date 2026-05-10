@@ -13,6 +13,9 @@ OCI Panel is a multi-account Oracle Cloud infrastructure console focused on acco
 项目架构说明已整理到：
 
 - [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)
+- [`docs/BASELINE_AUDIT_2026-05-10.md`](./docs/BASELINE_AUDIT_2026-05-10.md)
+- [`docs/DEVELOPMENT_PLAN_2026-05-10.md`](./docs/DEVELOPMENT_PLAN_2026-05-10.md)
+- [`docs/OCI_NATIVE_OPERATIONS_RESEARCH_2026-05-10.md`](./docs/OCI_NATIVE_OPERATIONS_RESEARCH_2026-05-10.md)
 
 其中包含：
 - 高层架构图
@@ -43,6 +46,7 @@ OCI Panel is a multi-account Oracle Cloud infrastructure console focused on acco
 - middleware 保护
 - Prisma 7 + SQLite
 - 敏感凭据服务端加密存储
+- 账户详情接口不再向浏览器返回解密后的私钥或 passphrase
 <img width="688" height="681" alt="截圖 2026-03-20 18 05 24" src="https://github.com/user-attachments/assets/e2c88d1f-609a-40b6-8a5e-e8fa36002220" />
 
 ### OCI 账户管理
@@ -62,6 +66,7 @@ OCI Panel is a multi-account Oracle Cloud infrastructure console focused on acco
 - 详情弹窗
 - 创建后状态跟踪
 - 高级 DD 功能已转向 OCI 原生能力版探索（不再继续强化 SSH 凭据输入方案）
+- SSH/DD 运行时接口已移除，当前只保留 OS Management Hub 托管能力检测
 <img width="1442" height="400" alt="截圖 2026-03-20 18 06 38" src="https://github.com/user-attachments/assets/a9de6b6b-60e2-404a-96fd-c52cdba850b5" />
 
 ### 实例资产详情
@@ -85,6 +90,7 @@ OCI Panel is a multi-account Oracle Cloud infrastructure console focused on acco
 - 调用真实 OCI `launchInstance`
 - 与 capacity 联动的创建可行性提示
 - 支持 `generated-ssh` / `manual-ssh` / `password` 三种登录初始化模式
+- 默认不分配公网 IP，需要公网时显式开启
 <img width="786" height="379" alt="截圖 2026-03-20 18 07 58" src="https://github.com/user-attachments/assets/0b57d97f-7175-4c28-9a9b-67ebec317e65" />
 <img width="641" height="526" alt="截圖 2026-03-20 18 07 54" src="https://github.com/user-attachments/assets/2cd2f26f-1625-407d-898c-14cd2007ce9b" />
 <img width="788" height="780" alt="截圖 2026-03-20 18 07 50" src="https://github.com/user-attachments/assets/de4caa6c-3fd1-43af-9307-c27dfa931143" />
@@ -105,6 +111,11 @@ OCI Panel is a multi-account Oracle Cloud infrastructure console focused on acco
 - P2C：实例列表资产化
 - P2D：Capacity 产品化
 - P2E：Dashboard 产品化第一版
+
+### 当前基线收口
+- P0：凭据边界、SSH/DD 删除、CI lint/audit gate 已完成
+- P1：React hook、账户状态、日志、API envelope 收敛已完成
+- P2：Dashboard / Create / Capacity / OCI 原生操作研究已完成第一轮收口
 
 ## 手动刷新控制台策略
 
@@ -212,12 +223,11 @@ launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/org.openclaw.oci-panel.p
 
 近期最值得继续的方向：
 
-- [ ] 推进 Instances 页面 DD 的 OCI 原生能力版，从能力检测走向真实任务提交
-- [ ] 深挖 `osmanagementhub` 的 job / work request / managed instance 能力
-- [ ] 继续强化 Dashboard 首页作为多账户 OCI 控制台入口
-- [ ] 打磨 Create / Capacity / Instances 的统一体验
-- [ ] 增强日志 / 审计 / 错误态 / 空态体验
-- [ ] 逐步补齐 GitHub Actions / CI / 文档体系
+- [ ] 使用真实 OCI 账户验证 OS Management Hub managed instance 匹配关系
+- [ ] 在验证后再设计 one-time scheduled job 提交，不回退到 SSH 凭据式 DD
+- [ ] 为账户凭据保留、停用账户过滤、API envelope 增加测试
+- [ ] 继续增强日志 / 审计 / 错误态 / 空态体验
+- [ ] 评估剩余低/中危依赖 advisories 的升级路线
 
 ## Legacy 迁移
 
@@ -238,6 +248,8 @@ npm run migrate:legacy-json -- --email you@example.com --archive
 如果要快速理解项目，优先阅读：
 
 - `PROJECT_INDEX.md`
+- `docs/BASELINE_AUDIT_2026-05-10.md`
+- `docs/DEVELOPMENT_PLAN_2026-05-10.md`
 - `prisma/schema.prisma`
 - `src/lib/auth.ts`
 - `src/lib/accounts-store.ts`

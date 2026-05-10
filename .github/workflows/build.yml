@@ -26,5 +26,11 @@ jobs:
       - name: Generate Prisma client
         run: npm run prisma:generate
 
+      - name: Lint
+        run: npm run lint
+
+      - name: Audit high severity vulnerabilities
+        run: npm audit --audit-level=high
+
       - name: Build
         run: npm run build

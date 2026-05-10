@@ -19,6 +19,14 @@ export interface StoredOracleAccount {
   updatedAt: string;
 }
 
+type AccountWriteInput = Omit<StoredOracleAccount, "id" | "userId" | "createdAt" | "updatedAt">;
+
+export interface AccountUpdateInput extends Omit<AccountWriteInput, "privateKey" | "passphrase"> {
+  privateKey?: string;
+  passphrase?: string;
+  replaceCredential?: boolean;
+}
+
 type DbOciAccount = Awaited<ReturnType<typeof prisma.ociAccount.findFirst>> extends infer T
   ? NonNullable<T>
   : never;
@@ -55,12 +63,12 @@ export async function listAccounts(userId: string): Promise<StoredOracleAccount[
 }
 
 export function pickDefaultAccount(accounts: StoredOracleAccount[]): StoredOracleAccount | undefined {
-  return accounts.find((item) => item.isDefault) ?? accounts[0];
+  return accounts.find((item) => item.isActive && item.isDefault) ?? accounts.find((item) => item.isActive);
 }
 
 export async function createAccount(
   userId: string,
-  input: Omit<StoredOracleAccount, "id" | "userId" | "createdAt" | "updatedAt">
+  input: AccountWriteInput
 ): Promise<StoredOracleAccount> {
   const existing = await prisma.ociAccount.findMany({
     where: { userId },
@@ -103,7 +111,7 @@ export async function createAccount(
 export async function updateAccount(
   userId: string,
   accountId: string,
-  input: Omit<StoredOracleAccount, "id" | "userId" | "createdAt" | "updatedAt">
+  input: AccountUpdateInput
 ): Promise<StoredOracleAccount> {
   const target = await prisma.ociAccount.findFirst({
     where: { id: accountId, userId },
@@ -115,6 +123,8 @@ export async function updateAccount(
 
   const shouldBeDefault = Boolean(input.isDefault);
 
+  const shouldReplaceCredential = Boolean(input.replaceCredential);
+
   await prisma.$transaction(async (tx: TransactionClient) => {
     if (shouldBeDefault) {
       await tx.ociAccount.updateMany({
@@ -123,6 +133,13 @@ export async function updateAccount(
       });
     }
 
+    const credentialUpdates = shouldReplaceCredential
+      ? {
+          privateKeyEncrypted: encrypt(input.privateKey || ""),
+          passphraseEncrypted: input.passphrase ? encrypt(input.passphrase) : null,
+        }
+      : {};
+
     await tx.ociAccount.update({
       where: { id: accountId },
       data: {
@@ -130,13 +147,12 @@ export async function updateAccount(
         tenancy: input.tenancy,
         userOcid: input.userOcid,
         fingerprint: input.fingerprint,
-        privateKeyEncrypted: encrypt(input.privateKey || ""),
         keyFilePath: input.keyFilePath || null,
         region: input.region,
-        passphraseEncrypted: input.passphrase ? encrypt(input.passphrase) : null,
         description: input.description || null,
         isDefault: shouldBeDefault,
         isActive: input.isActive,
+        ...credentialUpdates,
       },
     });
   });
@@ -156,7 +172,7 @@ export async function setAccountActiveState(userId: string, accountId: string, i
 
   if (!isActive && target.isDefault) {
     const fallback = await prisma.ociAccount.findFirst({
-      where: { userId, id: { not: accountId } },
+      where: { userId, id: { not: accountId }, isActive: true },
       orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
     });
 
@@ -169,9 +185,15 @@ export async function setAccountActiveState(userId: string, accountId: string, i
       await tx.ociAccount.update({ where: { id: fallback.id }, data: { isDefault: true } });
     });
   } else {
-    await prisma.ociAccount.update({
-      where: { id: accountId },
-      data: { isActive },
+    await prisma.$transaction(async (tx: TransactionClient) => {
+      const activeDefault = await tx.ociAccount.findFirst({
+        where: { userId, isDefault: true, isActive: true },
+      });
+
+      await tx.ociAccount.update({
+        where: { id: accountId },
+        data: { isActive, isDefault: isActive && !activeDefault ? true : target.isDefault },
+      });
     });
   }
 
@@ -186,6 +208,10 @@ export async function setDefaultAccount(userId: string, accountId: string): Prom
 
   if (!target) {
     throw new Error("账户不存在");
+  }
+
+  if (!target.isActive) {
+    throw new Error("停用账户不能设为默认账户，请先启用");
   }
 
   await prisma.$transaction(async (tx: TransactionClient) => {

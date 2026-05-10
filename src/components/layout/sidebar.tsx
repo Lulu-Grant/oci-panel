@@ -7,7 +7,6 @@ const navItems = [
   { label: "额度与资源", href: "/capacity" },
   { label: "创建实例", href: "/create" },
   { label: "操作日志", href: "/logs" },
-  { label: "设置", href: "/settings" },
 ];
 
 export function Sidebar() {

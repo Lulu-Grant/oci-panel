@@ -5,6 +5,7 @@ import { AccountsTable } from "@/components/accounts/accounts-table";
 import { AddAccountForm } from "@/components/accounts/add-account-form";
 import { AppShell } from "@/components/layout/app-shell";
 import { formatDateTimeWithRelative } from "@/lib/format";
+import { readApiData } from "@/lib/api-client";
 import { readManualCache, writeManualCache } from "@/lib/manual-cache";
 import { AccountItem } from "@/types/dashboard";
 
@@ -32,10 +33,9 @@ export default function AccountsPage() {
       if (mode === "refresh") setRefreshing(true);
       setError(null);
       const res = await fetch("/api/accounts/summary", { cache: "no-store" });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json?.message || "加载账户列表失败");
-      setAccounts(json as AccountItem[]);
-      const cache = writeManualCache(ACCOUNTS_CACHE_KEY, json as AccountItem[]);
+      const accountData = await readApiData<AccountItem[]>(res);
+      setAccounts(accountData);
+      const cache = writeManualCache(ACCOUNTS_CACHE_KEY, accountData);
       setLastRefreshedAt(cache?.refreshedAt || new Date().toISOString());
     } catch (err) {
       setError(err instanceof Error ? err.message : "未知错误");

@@ -16,6 +16,7 @@
 
 开始新一轮开发前，建议先确认：
 
+- 先阅读 `docs/BASELINE_AUDIT_2026-05-10.md` 与 `docs/DEVELOPMENT_PLAN_2026-05-10.md`，确认本轮任务是否属于新基线优先级
 - 当前产品定位是否仍然围绕“OCI 多账户资产控制平台”
 - 本次改动属于哪条主线：
   - 平台基础
@@ -137,7 +138,7 @@ P2 已接近完整，后续可继续：
 
 ## 本地路径
 
-- 项目根目录：`/Users/apple/.openclaw/workspace/oci-panel`
+- 项目根目录：`/Users/apple/Documents/oci_panel`
 
 ## 技术栈
 
@@ -201,6 +202,15 @@ launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/org.openclaw.oci-panel.p
 
 ### `LEGACY_CLEANUP.md`
 legacy JSON 清理说明，记录旧数据迁移策略。
+
+### `docs/BASELINE_AUDIT_2026-05-10.md`
+当前重新拉取后的基线审计，记录可运行状态、安全风险、痛点、功能取舍与建议新基线。
+
+### `docs/DEVELOPMENT_PLAN_2026-05-10.md`
+下一阶段任务板，按 P0/P1/P2 排序，用于后续逐项推进。
+
+### `docs/OCI_NATIVE_OPERATIONS_RESEARCH_2026-05-10.md`
+OCI 原生高级操作研究记录，定义 OS Management Hub 替代 SSH/DD 的候选路径与当前不提交真实任务的边界。
 
 ### `.env`
 本地环境变量。
@@ -339,6 +349,14 @@ OCI 账户主接口。
 - 调用真实 OCI 创建实例
 - 写日志
 
+### `src/app/api/instances/reinstall-capability/route.ts`
+OCI 托管能力检测接口。
+
+作用：
+- 检测实例是否可能被 OS Management Hub 托管
+- 仅返回能力状态，不提交重装、更新或重启任务
+- 不接收 SSH 私钥、主机密码或自定义镜像参数
+
 ---
 
 ## 容量与创建辅助
@@ -386,7 +404,7 @@ OCI 账户主接口。
 注册页。
 
 ### `src/app/settings/page.tsx`
-设置页，目前作用较弱，后续可扩展。
+设置页，目前作用较弱，已从侧边导航隐藏。
 
 ---
 
@@ -399,9 +417,7 @@ OCI 账户主接口。
 - 当前账户总览
 - 最近活动
 - 基础统计
-
-后续建议：
-- 继续做 P2E 产品化
+- 账户健康与下一步操作提示
 
 ### `src/app/accounts/page.tsx`
 账户管理页。
@@ -434,6 +450,7 @@ OCI 账户主接口。
 作用：
 - 创建实例主工作区
 - P2A 当前最完整的页面之一
+- 默认偏向无公网 IP 的更安全配置，公网需显式启用
 
 ### `src/app/capacity/page.tsx`
 额度与资源页。
@@ -442,6 +459,7 @@ OCI 账户主接口。
 - Capacity 总览
 - Compute 聚焦
 - limit values 可读展示
+- A1 / Flex / OCPU / Memory 快速核对
 
 ### `src/app/logs/page.tsx`
 日志页。
@@ -536,11 +554,14 @@ OCI 账户数据库读写封装。
 ### `src/lib/logs-store.ts`
 日志数据库读写封装。
 
+### `src/lib/api-response.ts`
+API 响应 envelope helper，统一输出 `{ success, data, message }`。
+
+### `src/lib/api-client.ts`
+前端 fetch 读取 helper，统一处理 API envelope 与错误消息。
+
 ### `src/lib/oci.ts`
 OCI SDK 客户端构造与相关逻辑。
-
-### `src/lib/mock-data.ts`
-历史 mock 残留文件，现阶段已非主线，应谨慎使用，避免误回滚到 mock 逻辑。
 
 ### `src/lib/utils.ts`
 通用工具函数。
@@ -600,6 +621,7 @@ launchd 配置模板。
 - Prisma + SQLite（当前阶段）
 - next-auth
 - 敏感字段服务端加密
+- API 响应统一使用 `{ success, data, message }`
 - 以后如有需要再切 PostgreSQL
 
 ---
@@ -611,14 +633,17 @@ launchd 配置模板。
 ### README 仍需跟随主线变化持续更新
 虽然已同步一版，但后续大改后仍容易过时。
 
-### `src/lib/mock-data.ts`
-是历史文件，当前主线不要误接回 mock。
+### 历史 mock 数据已移除
+`src/lib/mock-data.ts` 已删除，运行时不要重新接回 mock 数据。
 
 ### 登录体系暂缓深挖
 当前保留基础框架即可，不作为近期主线。
 
-### 账户编辑/删除未补齐
-当前账户管理闭环还不完整，后续仍值得做。
+### 账户状态边界
+停用账户不再参与默认账户选择，也不再执行 OCI 读取、创建、容量、实例操作或托管能力检测。
+
+### OCI 原生高级操作边界
+SSH/DD 运行时已经移除。OS Management Hub 只保留能力检测与研究文档，真实任务提交需先完成 managed instance 匹配验证。
 
 ---
 
@@ -626,10 +651,9 @@ launchd 配置模板。
 
 ## 当前建议顺序
 
-1. P2E：Dashboard 总览页产品化
-2. P2F：全站体验统一收口
+1. OS Management Hub managed instance 匹配实测
+2. 账户凭据保留、停用账户过滤等核心路径补测试
 3. 之后再考虑：
-   - 账户管理闭环（编辑/删除）
    - 更深的 OCI 资产扩展
    - 模板持久化
    - 更精细的 quota / shape 预检查
